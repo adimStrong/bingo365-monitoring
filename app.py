@@ -192,6 +192,11 @@ def main():
     # Data source toggle
     use_real_data = st.sidebar.checkbox("Use Google Sheets Data", value=True)
 
+    # Refresh button to clear cache and reload data
+    if st.sidebar.button("🔄 Refresh Data"):
+        st.cache_data.clear()
+        st.rerun()
+
     # Load data
     if use_real_data:
         st.sidebar.info("Loading from Google Sheets...")
