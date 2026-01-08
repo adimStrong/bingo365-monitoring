@@ -149,11 +149,10 @@ def load_agent_performance_data(agent_name, sheet_name):
             creative_content = str(row.iloc[17]) if len(row) > 17 and pd.notna(row.iloc[17]) else ''  # R - CONTENT
             creative_total = int(parse_numeric(row.iloc[16] if len(row) > 16 else 0))  # Q - TOTAL
 
-            # Add record if EITHER creative_content exists OR creative_total > 0
+            # Only count creative work when actual content exists
             has_content = creative_content and creative_content.strip() and creative_content != 'nan'
-            has_total = creative_total > 0
 
-            if has_content or has_total:
+            if has_content:
                 # Get folder/type from current row or use last valid
                 creative_folder_raw = str(row.iloc[14]) if len(row) > 14 and pd.notna(row.iloc[14]) else ''
                 if not creative_folder_raw or creative_folder_raw == 'nan':
@@ -171,8 +170,8 @@ def load_agent_performance_data(agent_name, sheet_name):
                     'agent_name': agent_name,
                     'creative_folder': creative_folder,
                     'creative_type': creative_type,
-                    'creative_total': creative_total if has_total else 1,  # Default to 1 if content exists but no total
-                    'creative_content': creative_content if has_content else f'Creative work #{len(creative_data)+1}',
+                    'creative_total': creative_total,  # Use actual value (can be 0)
+                    'creative_content': creative_content,
                     'caption': str(row.iloc[18]) if len(row) > 18 and pd.notna(row.iloc[18]) else '',  # S - CAPTION
                     'creative_remarks': str(row.iloc[19]) if len(row) > 19 and pd.notna(row.iloc[19]) else '',  # T - REMARKS
                 })
