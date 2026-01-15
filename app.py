@@ -489,7 +489,12 @@ def render_overview(running_ads_df, creative_df, sms_df, content_df):
         agent_sms = daily_sms.groupby('agent_name')['sms_total'].sum().rename('sms_total')
     else:
         agent_sms = sms_df.groupby('agent_name').size().rename('sms_total')
-    agent_content = content_df.groupby('agent_name').size().rename('content_posts')
+    # Only count Primary Text for copywriting
+    if 'content_type' in content_df.columns:
+        primary_content_df = content_df[content_df['content_type'] == 'Primary Text']
+    else:
+        primary_content_df = content_df
+    agent_content = primary_content_df.groupby('agent_name').size().rename('content_posts')
 
     summary = agent_ads.join(agent_creative).join(agent_sms).join(agent_content).reset_index()
 
@@ -784,14 +789,20 @@ def render_content_analysis(content_df, selected_agent):
         st.warning("No content data available.")
         return
 
-    # Summary metrics
+    # Summary metrics - only count Primary Text
     col1, col2, col3, col4 = st.columns(4)
 
-    unique_content = content_df['primary_content'].nunique()
-    total_content = len(content_df)
+    # Filter for Primary Text only for metrics
+    if 'content_type' in content_df.columns:
+        primary_df = content_df[content_df['content_type'] == 'Primary Text']
+    else:
+        primary_df = content_df
+
+    unique_content = primary_df['primary_content'].nunique() if not primary_df.empty else 0
+    total_content = len(primary_df)
 
     with col1:
-        st.metric("Total Posts", f"{total_content:,}")
+        st.metric("Total Primary Text", f"{total_content:,}")
     with col2:
         st.metric("Unique Content", f"{unique_content:,}")
     with col3:
@@ -818,26 +829,31 @@ def render_content_analysis(content_df, selected_agent):
         st.plotly_chart(fig, use_container_width=True)
 
     with col2:
-        st.subheader("Daily Content Posts")
-        daily_content = content_df.copy()
-        daily_content['date_only'] = daily_content['date'].dt.date
-        daily_agg = daily_content.groupby('date_only').size().reset_index(name='posts')
-        fig = px.bar(
-            daily_agg,
-            x='date_only',
-            y='posts',
-            color='posts',
-            color_continuous_scale='Blues'
-        )
-        fig.update_layout(height=300, xaxis_tickformat='%Y-%m-%d')
-        fig.update_xaxes(type='category')  # Prevent duplicate dates
-        st.plotly_chart(fig, use_container_width=True)
+        st.subheader("Daily Primary Text Posts")
+        # Use primary_df for daily chart (Primary Text only)
+        if not primary_df.empty:
+            daily_content = primary_df.copy()
+            daily_content['date_only'] = daily_content['date'].dt.date
+            daily_agg = daily_content.groupby('date_only').size().reset_index(name='posts')
+            fig = px.bar(
+                daily_agg,
+                x='date_only',
+                y='posts',
+                color='posts',
+                color_continuous_scale='Blues'
+            )
+            fig.update_layout(height=300, xaxis_tickformat='%Y-%m-%d')
+            fig.update_xaxes(type='category')  # Prevent duplicate dates
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No Primary Text data available")
 
     # Similarity Analysis
     st.divider()
-    st.subheader("Content Similarity Analysis")
+    st.subheader("Content Similarity Analysis (Primary Text)")
 
-    unique_contents = content_df['primary_content'].unique().tolist()
+    # Use primary_df for similarity analysis
+    unique_contents = primary_df['primary_content'].unique().tolist() if not primary_df.empty else []
 
     col1, col2 = st.columns([1, 2])
 
