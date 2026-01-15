@@ -137,12 +137,18 @@ def calculate_agent_stats(creative_df, sms_df, content_df):
             else:
                 stats[agent]['sms'] = len(agent_data)
 
-    # Copywriting stats (formerly content)
+    # Copywriting stats - only count Primary Text entries
     if not content_df.empty and 'agent_name' in content_df.columns:
-        for agent in content_df['agent_name'].unique():
+        # Filter for Primary Text only
+        if 'content_type' in content_df.columns:
+            primary_df = content_df[content_df['content_type'] == 'Primary Text']
+        else:
+            primary_df = content_df
+
+        for agent in primary_df['agent_name'].unique():
             if agent not in stats:
                 stats[agent] = {'creative': 0, 'sms': 0, 'copywriting': 0}
-            stats[agent]['copywriting'] = len(content_df[content_df['agent_name'] == agent])
+            stats[agent]['copywriting'] = len(primary_df[primary_df['agent_name'] == agent])
 
     return stats
 
@@ -258,21 +264,28 @@ def generate_t1_report(all_ads, all_creative, all_sms, all_content):
     report += f"{'TOTAL':<10}{total_t1_sms:>6}{total_avg_sms:>8.1f}{diff_str:>8}\n"
     report += "</pre>\n\n"
 
-    # Copywriting Summary (total, not date-filtered)
+    # Copywriting Summary - only Primary Text entries
     if not content_df.empty:
-        report += "📝 <b>COPYWRITING TOTAL</b>\n<pre>"
-        report += f"{'Name':<10}{'Posts':>6}\n"
-        report += "-" * 16 + "\n"
+        # Filter for Primary Text only
+        if 'content_type' in content_df.columns:
+            primary_df = content_df[content_df['content_type'] == 'Primary Text']
+        else:
+            primary_df = content_df
 
-        total_copy = 0
-        for agent in sorted(content_df['agent_name'].unique()):
-            count = len(content_df[content_df['agent_name'] == agent])
-            total_copy += count
-            report += f"{agent:<10}{count:>6}\n"
+        if not primary_df.empty:
+            report += "📝 <b>COPYWRITING TOTAL</b>\n<pre>"
+            report += f"{'Name':<10}{'Posts':>6}\n"
+            report += "-" * 16 + "\n"
 
-        report += "-" * 16 + "\n"
-        report += f"{'TOTAL':<10}{total_copy:>6}\n"
-        report += "</pre>"
+            total_copy = 0
+            for agent in sorted(primary_df['agent_name'].unique()):
+                count = len(primary_df[primary_df['agent_name'] == agent])
+                total_copy += count
+                report += f"{agent:<10}{count:>6}\n"
+
+            report += "-" * 16 + "\n"
+            report += f"{'TOTAL':<10}{total_copy:>6}\n"
+            report += "</pre>"
 
     return report
 
@@ -351,24 +364,27 @@ def generate_weekly_report(all_ads, all_creative, all_sms, all_content):
     report += f"{'TOTAL':<10}{total_sms:>7}{total_sms/7:>7.1f}\n"
     report += "</pre>\n\n"
 
-    # Copywriting Summary
+    # Copywriting Summary - only Primary Text entries
     if not content_df.empty:
-        total_content = len(content_df)
-        primary_count = len(content_df[content_df['content_type'] == 'Primary Text']) if 'content_type' in content_df.columns else 0
-        headline_count = len(content_df[content_df['content_type'] == 'Headline']) if 'content_type' in content_df.columns else 0
+        # Filter for Primary Text only
+        if 'content_type' in content_df.columns:
+            primary_df = content_df[content_df['content_type'] == 'Primary Text']
+        else:
+            primary_df = content_df
 
-        report += "📝 <b>COPYWRITING TOTAL</b>\n"
-        report += f"Total: <b>{total_content}</b>\n"
-        report += f"  Primary Text: {primary_count}\n"
-        report += f"  Headlines: {headline_count}\n\n"
+        if not primary_df.empty:
+            total_primary = len(primary_df)
 
-        report += "<pre>"
-        report += f"{'Name':<10}{'Posts':>6}\n"
-        report += "-" * 16 + "\n"
-        for agent in sorted(content_df['agent_name'].unique()):
-            count = len(content_df[content_df['agent_name'] == agent])
-            report += f"{agent:<10}{count:>6}\n"
-        report += "</pre>"
+            report += "📝 <b>COPYWRITING (Primary Text)</b>\n"
+            report += f"Total: <b>{total_primary}</b>\n\n"
+
+            report += "<pre>"
+            report += f"{'Name':<10}{'Posts':>6}\n"
+            report += "-" * 16 + "\n"
+            for agent in sorted(primary_df['agent_name'].unique()):
+                count = len(primary_df[primary_df['agent_name'] == agent])
+                report += f"{agent:<10}{count:>6}\n"
+            report += "</pre>"
 
     return report
 
@@ -492,26 +508,29 @@ def generate_no_ads_report(creative_list, sms_list, content_list, report_date):
         report += f"{'TOTAL':<10}{total_sms:>6}\n"
         report += "</pre>\n\n"
 
-    # Copywriting Summary
+    # Copywriting Summary - only Primary Text entries
     if content_list:
         content_df = pd.concat(content_list, ignore_index=True)
-        total_content = len(content_df)
 
-        primary_count = len(content_df[content_df['content_type'] == 'Primary Text']) if 'content_type' in content_df.columns else 0
-        headline_count = len(content_df[content_df['content_type'] == 'Headline']) if 'content_type' in content_df.columns else 0
+        # Filter for Primary Text only
+        if 'content_type' in content_df.columns:
+            primary_df = content_df[content_df['content_type'] == 'Primary Text']
+        else:
+            primary_df = content_df
 
-        report += "📝 <b>COPYWRITING</b>\n"
-        report += f"Total Posts: <b>{total_content}</b>\n"
-        report += f"  Primary Text: {primary_count}\n"
-        report += f"  Headlines: {headline_count}\n\n"
+        if not primary_df.empty:
+            total_primary = len(primary_df)
 
-        report += "<pre>"
-        report += f"{'Name':<10}{'Posts':>6}\n"
-        report += "-" * 16 + "\n"
-        for agent in sorted(content_df['agent_name'].unique()):
-            agent_count = len(content_df[content_df['agent_name'] == agent])
-            report += f"{agent:<10}{agent_count:>6}\n"
-        report += "</pre>"
+            report += "📝 <b>COPYWRITING (Primary Text)</b>\n"
+            report += f"Total: <b>{total_primary}</b>\n\n"
+
+            report += "<pre>"
+            report += f"{'Name':<10}{'Posts':>6}\n"
+            report += "-" * 16 + "\n"
+            for agent in sorted(primary_df['agent_name'].unique()):
+                agent_count = len(primary_df[primary_df['agent_name'] == agent])
+                report += f"{agent:<10}{agent_count:>6}\n"
+            report += "</pre>"
 
     return report
 
