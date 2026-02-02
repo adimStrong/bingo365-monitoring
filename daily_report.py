@@ -434,7 +434,7 @@ def generate_t1_report(all_ads, all_creative, all_sms, all_content, fb_ads_df=No
             avg_stats[agent]['sms'] = total / 7
 
     # Build report - Facebook Ads only
-    report = f"📊 <b>BINGO365 T+1 Report</b> - {yesterday.strftime('%b %d, %Y')}\n"
+    report = f"📊 <b>Advertiser KPI Report</b> - {yesterday.strftime('%b %d, %Y')}\n"
     report += f"<i>vs Last 7 Days Average</i>\n\n"
 
     # Facebook Ads Section only
@@ -466,7 +466,7 @@ def generate_weekly_report(all_ads, all_creative, all_sms, all_content):
     # Content (no date filter)
     content_df = pd.concat(all_content, ignore_index=True) if all_content else pd.DataFrame()
 
-    report = f"📊 <b>BINGO365 Weekly Report</b>\n"
+    report = f"📊 <b>Advertiser KPI Weekly Report</b>\n"
     report += f"<i>{week_ago.strftime('%b %d')} - {today.strftime('%b %d, %Y')}</i>\n\n"
 
     # Creative Weekly Summary
@@ -571,7 +571,7 @@ def check_running_ads(ads_list, target_date=None):
 
 def generate_ads_report(ads_df, report_date):
     """Generate report when ads are running"""
-    report = f"📊 <b>BINGO365 Daily Report</b> - {report_date.strftime('%b %d, %Y')}\n\n"
+    report = f"📊 <b>Advertiser KPI Report</b> - {report_date.strftime('%b %d, %Y')}\n\n"
     report += "🎯 <b>RUNNING ADS SUMMARY</b>\n"
     report += "<pre>"
     report += f"{'Name':<10}{'Ads':>6}{'Impr':>10}{'Clicks':>8}{'CTR%':>7}\n"
@@ -606,7 +606,7 @@ def generate_ads_report(ads_df, report_date):
 
 def generate_no_ads_report(creative_list, sms_list, content_list, report_date):
     """Generate report when no ads are running"""
-    report = f"📊 <b>BINGO365 Daily Report</b> - {report_date.strftime('%b %d, %Y')}\n\n"
+    report = f"📊 <b>Advertiser KPI Report</b> - {report_date.strftime('%b %d, %Y')}\n\n"
     report += "⚠️ <b>No Running Ads Today</b>\n\n"
 
     # Creative Summary
@@ -702,7 +702,7 @@ def generate_daily_report(report_date=None, send_to_telegram=True):
     # Load Facebook Ads data only
     fb_ads_df = load_facebook_ads_data()
 
-    report = f"📊 <b>BINGO365 Daily Report</b> - {report_date.strftime('%b %d, %Y')}\n\n"
+    report = f"📊 <b>Advertiser KPI Report</b> - {report_date.strftime('%b %d, %Y')}\n\n"
 
     if fb_ads_df is not None and not fb_ads_df.empty:
         fb_section = generate_facebook_ads_section(fb_ads_df, report_date)
@@ -779,7 +779,7 @@ def preview_report(report_date=None):
 
 if __name__ == "__main__":
     print("=" * 50)
-    print("BINGO365 Daily Report Generator")
+    print("Advertiser KPI Report Generator")
     print("=" * 50)
     report = preview_report()
     print("\n" + report)

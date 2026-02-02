@@ -499,15 +499,24 @@ def load_facebook_ads_data():
     """
     try:
         import gspread
+        import json
         from google.oauth2.service_account import Credentials
 
-        creds_file = os.path.join(os.path.dirname(__file__), FACEBOOK_ADS_CREDENTIALS_FILE)
-        if not os.path.exists(creds_file):
-            print(f"Facebook Ads credentials file not found: {creds_file}")
-            return pd.DataFrame()
-
         scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-        creds = Credentials.from_service_account_file(creds_file, scopes=scopes)
+
+        # Try environment variable first (for Railway/cloud deployment)
+        google_creds_json = os.getenv('GOOGLE_CREDENTIALS')
+        if google_creds_json:
+            creds_dict = json.loads(google_creds_json)
+            creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        else:
+            # Fall back to credentials file (local development)
+            creds_file = os.path.join(os.path.dirname(__file__), FACEBOOK_ADS_CREDENTIALS_FILE)
+            if not os.path.exists(creds_file):
+                print(f"Facebook Ads credentials file not found: {creds_file}")
+                return pd.DataFrame()
+            creds = Credentials.from_service_account_file(creds_file, scopes=scopes)
+
         client = gspread.authorize(creds)
 
         spreadsheet = client.open_by_key(FACEBOOK_ADS_SHEET_ID)
