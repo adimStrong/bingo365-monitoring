@@ -416,11 +416,11 @@ else:
         column_config={
             "#": st.column_config.NumberColumn(width="small"),
             "Agent": st.column_config.TextColumn(width="medium"),
-            "Spend": st.column_config.NumberColumn(format="$,.2f", width="small"),
-            "Register": st.column_config.NumberColumn(format=",d", width="small"),
-            "FTD": st.column_config.NumberColumn(format=",d", width="small"),
-            "CPR": st.column_config.NumberColumn(format="$,.2f", width="small"),
-            "Cost/FTD": st.column_config.NumberColumn(format="$,.2f", width="small"),
+            "Spend": st.column_config.NumberColumn(format="$ %.2f", width="small"),
+            "Register": st.column_config.NumberColumn(format="%d", width="small"),
+            "FTD": st.column_config.NumberColumn(format="%d", width="small"),
+            "CPR": st.column_config.NumberColumn(format="$ %.2f", width="small"),
+            "Cost/FTD": st.column_config.NumberColumn(format="$ %.2f", width="small"),
         }
     )
 
@@ -434,14 +434,14 @@ else:
             use_container_width=True,
             hide_index=True,
             column_config={
-                "Spend": st.column_config.NumberColumn(format="$,.2f"),
-                "Impressions": st.column_config.NumberColumn(format=",d"),
-                "Reach": st.column_config.NumberColumn(format=",d"),
-                "Clicks": st.column_config.NumberColumn(format=",d"),
+                "Spend": st.column_config.NumberColumn(format="$ %.2f"),
+                "Impressions": st.column_config.NumberColumn(format="%d"),
+                "Reach": st.column_config.NumberColumn(format="%d"),
+                "Clicks": st.column_config.NumberColumn(format="%d"),
                 "CTR %": st.column_config.NumberColumn(format="%.2f%%"),
-                "Register": st.column_config.NumberColumn(format=",d"),
-                "FTD": st.column_config.NumberColumn(format=",d"),
-                "CPR": st.column_config.NumberColumn(format="$,.2f"),
-                "Cost/FTD": st.column_config.NumberColumn(format="$,.2f"),
+                "Register": st.column_config.NumberColumn(format="%d"),
+                "FTD": st.column_config.NumberColumn(format="%d"),
+                "CPR": st.column_config.NumberColumn(format="$ %.2f"),
+                "Cost/FTD": st.column_config.NumberColumn(format="$ %.2f"),
             }
         )
