@@ -3,6 +3,15 @@ BINGO365 Daily Monitoring Dashboard
 Main Streamlit Application
 """
 import streamlit as st
+
+# Page configuration - MUST be first Streamlit command
+st.set_page_config(
+    page_title="Advertiser KPI Dashboard",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -16,14 +25,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import PAGE_TITLE, PAGE_ICON, AGENTS, SMS_TYPES
 from data_loader import load_all_data, get_date_range, load_facebook_ads_data
-
-# Page configuration
-st.set_page_config(
-    page_title=PAGE_TITLE,
-    page_icon=PAGE_ICON,
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # Custom CSS
 st.markdown("""

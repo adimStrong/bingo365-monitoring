@@ -14,8 +14,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import AGENTS, SMS_TYPES
 from data_loader import load_agent_performance_data, load_agent_content_data, get_date_range, load_facebook_ads_data
 
-st.set_page_config(page_title="Agent Performance", page_icon="👤", layout="wide")
-
 # Sidebar logo
 logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "logo.jpg")
 if os.path.exists(logo_path):
