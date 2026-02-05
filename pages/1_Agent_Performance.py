@@ -11,7 +11,7 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import AGENTS, SMS_TYPES
+from config import AGENTS, SMS_TYPES, FACEBOOK_ADS_PERSONS
 from data_loader import load_agent_performance_data, load_agent_content_data, get_date_range, load_facebook_ads_data
 
 # Sidebar logo
@@ -33,14 +33,14 @@ def get_agent_data(agent_name, sheet_name):
 # Sidebar filters
 st.sidebar.header("Filters")
 
-# Agent selector
+# Agent selector - use all Facebook Ads persons
 selected_agent = st.sidebar.selectbox(
     "Select Agent",
-    [a['name'] for a in AGENTS],
+    FACEBOOK_ADS_PERSONS,
     index=0
 )
 
-# Get agent config
+# Get agent config (for legacy sheets - may be None for FB-only agents like RON, JASON, DER)
 agent_config = next((a for a in AGENTS if a['name'] == selected_agent), None)
 
 # Data source toggle
