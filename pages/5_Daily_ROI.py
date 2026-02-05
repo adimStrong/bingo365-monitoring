@@ -1,0 +1,399 @@
+"""
+Channel ROI - Daily ROI
+Shows Facebook and Google Daily ROI performance comparison
+"""
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from channel_data_loader import load_fb_channel_data, load_google_channel_data, refresh_channel_data
+from config import CHANNEL_ROI_ENABLED
+
+st.set_page_config(page_title="Daily ROI", page_icon="📊", layout="wide")
+
+st.markdown("""
+<style>
+    .fb-card {
+        background: linear-gradient(135deg, #1877f2 0%, #42a5f5 100%);
+        padding: 20px; border-radius: 15px; color: white; text-align: center;
+    }
+    .google-card {
+        background: linear-gradient(135deg, #ea4335 0%, #ff6b6b 100%);
+        padding: 20px; border-radius: 15px; color: white; text-align: center;
+    }
+    .section-header {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        color: white; padding: 15px; border-radius: 10px; margin: 20px 0 10px 0;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+
+def format_currency(value):
+    if pd.isna(value) or value == 0:
+        return "$0.00"
+    return f"${value:,.2f}"
+
+
+def format_number(value):
+    if pd.isna(value):
+        return "0"
+    return f"{int(value):,}"
+
+
+def main():
+    st.title("📊 Daily ROI Dashboard")
+    st.markdown("Facebook vs Google - Daily ROI Performance Comparison")
+
+    if not CHANNEL_ROI_ENABLED:
+        st.warning("Channel ROI Dashboard is disabled.")
+        return
+
+    # Load data
+    with st.spinner("Loading data..."):
+        fb_df = load_fb_channel_data()
+        google_data = load_google_channel_data()
+        google_df = google_data.get('daily_roi', pd.DataFrame())
+
+    # Check data availability
+    has_fb = not fb_df.empty
+    has_google = not google_df.empty
+
+    if not has_fb and not has_google:
+        st.error("No Daily ROI data available.")
+        return
+
+    # Prepare dates
+    all_dates = []
+    if has_fb:
+        fb_df['date'] = pd.to_datetime(fb_df['date'])
+        all_dates.extend(fb_df['date'].tolist())
+    if has_google:
+        google_df['date'] = pd.to_datetime(google_df['date'])
+        all_dates.extend(google_df['date'].tolist())
+
+    data_min_date = min(all_dates).date()
+    data_max_date = max(all_dates).date()
+    yesterday = datetime.now().date() - timedelta(days=1)
+    max_selectable_date = min(data_max_date, yesterday)
+
+    # Sidebar
+    with st.sidebar:
+        st.header("Controls")
+
+        if st.button("🔄 Refresh", type="primary", use_container_width=True):
+            refresh_channel_data()
+            st.cache_data.clear()
+            st.rerun()
+
+        st.markdown("---")
+        st.subheader("📅 Date Range")
+
+        default_start = max(data_min_date, max_selectable_date - timedelta(days=30))
+        date_from = st.date_input("From", value=default_start, min_value=data_min_date, max_value=max_selectable_date)
+        date_to = st.date_input("To", value=max_selectable_date, min_value=data_min_date, max_value=max_selectable_date)
+
+        st.markdown("---")
+        st.subheader("Other Reports")
+        st.page_link("pages/6_Roll_Back.py", label="🔄 Roll Back", icon="📈")
+        st.page_link("pages/7_Violet.py", label="💜 Violet", icon="📈")
+
+    # Filter by date
+    if has_fb:
+        fb_df = fb_df[(fb_df['date'].dt.date >= date_from) & (fb_df['date'].dt.date <= date_to)]
+    if has_google:
+        google_df = google_df[(google_df['date'].dt.date >= date_from) & (google_df['date'].dt.date <= date_to)]
+
+    # Summary comparison
+    st.markdown('<div class="section-header"><h3>📊 CHANNEL COMPARISON - DAILY ROI</h3></div>', unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+
+    # Facebook Summary
+    with col1:
+        if has_fb and not fb_df.empty:
+            fb_totals = {
+                'cost': fb_df['cost'].sum(),
+                'register': fb_df['register'].sum(),
+                'ftd': fb_df['ftd'].sum(),
+            }
+            fb_totals['cpr'] = fb_totals['cost'] / fb_totals['register'] if fb_totals['register'] > 0 else 0
+            fb_totals['cost_ftd'] = fb_totals['cost'] / fb_totals['ftd'] if fb_totals['ftd'] > 0 else 0
+            fb_totals['conv_rate'] = (fb_totals['ftd'] / fb_totals['register'] * 100) if fb_totals['register'] > 0 else 0
+
+            st.markdown(f"""
+            <div class="fb-card">
+                <h2>📘 FACEBOOK</h2>
+                <hr style="border-color: rgba(255,255,255,0.3);">
+                <p><strong>Cost:</strong> {format_currency(fb_totals['cost'])}</p>
+                <p><strong>Register:</strong> {format_number(fb_totals['register'])}</p>
+                <p><strong>FTD:</strong> {format_number(fb_totals['ftd'])}</p>
+                <p><strong>CPR:</strong> {format_currency(fb_totals['cpr'])}</p>
+                <p><strong>Cost/FTD:</strong> {format_currency(fb_totals['cost_ftd'])}</p>
+                <p><strong>Conv Rate:</strong> {fb_totals['conv_rate']:.2f}%</p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.info("No Facebook data in selected range")
+
+    # Google Summary
+    with col2:
+        if has_google and not google_df.empty:
+            g_totals = {
+                'cost': google_df['cost'].sum(),
+                'register': google_df['register'].sum(),
+                'ftd': google_df['ftd'].sum(),
+            }
+            g_totals['cpr'] = g_totals['cost'] / g_totals['register'] if g_totals['register'] > 0 else 0
+            g_totals['cost_ftd'] = g_totals['cost'] / g_totals['ftd'] if g_totals['ftd'] > 0 else 0
+            g_totals['conv_rate'] = (g_totals['ftd'] / g_totals['register'] * 100) if g_totals['register'] > 0 else 0
+
+            st.markdown(f"""
+            <div class="google-card">
+                <h2>🔍 GOOGLE</h2>
+                <hr style="border-color: rgba(255,255,255,0.3);">
+                <p><strong>Cost:</strong> {format_currency(g_totals['cost'])}</p>
+                <p><strong>Register:</strong> {format_number(g_totals['register'])}</p>
+                <p><strong>FTD:</strong> {format_number(g_totals['ftd'])}</p>
+                <p><strong>CPR:</strong> {format_currency(g_totals['cpr'])}</p>
+                <p><strong>Cost/FTD:</strong> {format_currency(g_totals['cost_ftd'])}</p>
+                <p><strong>Conv Rate:</strong> {g_totals['conv_rate']:.2f}%</p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.info("No Google Daily ROI data in selected range")
+
+    st.markdown("---")
+
+    # Combined trend chart
+    st.markdown('<div class="section-header"><h3>📅 DAILY TREND COMPARISON</h3></div>', unsafe_allow_html=True)
+
+    # Prepare combined data
+    chart_data = []
+    if has_fb and not fb_df.empty:
+        fb_daily = fb_df.groupby(fb_df['date'].dt.date).agg({'cost': 'sum', 'ftd': 'sum', 'register': 'sum'}).reset_index()
+        fb_daily['channel'] = 'Facebook'
+        fb_daily.columns = ['date', 'cost', 'ftd', 'register', 'channel']
+        chart_data.append(fb_daily)
+
+    if has_google and not google_df.empty:
+        g_daily = google_df.groupby(google_df['date'].dt.date).agg({'cost': 'sum', 'ftd': 'sum', 'register': 'sum'}).reset_index()
+        g_daily['channel'] = 'Google'
+        g_daily.columns = ['date', 'cost', 'ftd', 'register', 'channel']
+        chart_data.append(g_daily)
+
+    if chart_data:
+        combined = pd.concat(chart_data, ignore_index=True)
+        # Calculate CPR and Cost/FTD
+        combined['cpr'] = combined.apply(lambda x: x['cost'] / x['register'] if x['register'] > 0 else 0, axis=1)
+        combined['cost_ftd'] = combined.apply(lambda x: x['cost'] / x['ftd'] if x['ftd'] > 0 else 0, axis=1)
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            fig = px.line(combined, x='date', y='cost', color='channel', markers=True,
+                         title='Daily Cost',
+                         color_discrete_map={'Facebook': '#1877f2', 'Google': '#ea4335'})
+            fig.update_layout(height=350, xaxis_title="Date", yaxis_title="Cost (USD)")
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            fig = px.line(combined, x='date', y='register', color='channel', markers=True,
+                         title='Daily Register',
+                         color_discrete_map={'Facebook': '#1877f2', 'Google': '#ea4335'})
+            fig.update_layout(height=350, xaxis_title="Date", yaxis_title="Register")
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col3:
+            fig = px.line(combined, x='date', y='ftd', color='channel', markers=True,
+                         title='Daily FTD',
+                         color_discrete_map={'Facebook': '#1877f2', 'Google': '#ea4335'})
+            fig.update_layout(height=350, xaxis_title="Date", yaxis_title="FTD")
+            st.plotly_chart(fig, use_container_width=True)
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            fig = px.line(combined, x='date', y='cpr', color='channel', markers=True,
+                         title='Daily CPR (Cost/Register)',
+                         color_discrete_map={'Facebook': '#1877f2', 'Google': '#ea4335'})
+            fig.update_layout(height=350, xaxis_title="Date", yaxis_title="CPR (USD)")
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            fig = px.line(combined, x='date', y='cost_ftd', color='channel', markers=True,
+                         title='Daily Cost/FTD',
+                         color_discrete_map={'Facebook': '#1877f2', 'Google': '#ea4335'})
+            fig.update_layout(height=350, xaxis_title="Date", yaxis_title="Cost/FTD (USD)")
+            st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("---")
+
+    # Weekly Summary
+    st.markdown('<div class="section-header"><h3>📆 WEEKLY SUMMARY</h3></div>', unsafe_allow_html=True)
+
+    weekly_data = []
+    if has_fb and not fb_df.empty:
+        fb_weekly = fb_df.copy()
+        fb_weekly['week'] = fb_weekly['date'].dt.isocalendar().week
+        fb_weekly['year'] = fb_weekly['date'].dt.isocalendar().year
+        fb_weekly['week_label'] = fb_weekly.apply(lambda x: f"{x['year']}-W{x['week']:02d}", axis=1)
+        fb_w = fb_weekly.groupby('week_label').agg({'cost': 'sum', 'ftd': 'sum', 'register': 'sum'}).reset_index()
+        fb_w['channel'] = 'Facebook'
+        weekly_data.append(fb_w)
+
+    if has_google and not google_df.empty:
+        g_weekly = google_df.copy()
+        g_weekly['week'] = g_weekly['date'].dt.isocalendar().week
+        g_weekly['year'] = g_weekly['date'].dt.isocalendar().year
+        g_weekly['week_label'] = g_weekly.apply(lambda x: f"{x['year']}-W{x['week']:02d}", axis=1)
+        g_w = g_weekly.groupby('week_label').agg({'cost': 'sum', 'ftd': 'sum', 'register': 'sum'}).reset_index()
+        g_w['channel'] = 'Google'
+        weekly_data.append(g_w)
+
+    if weekly_data:
+        weekly_combined = pd.concat(weekly_data, ignore_index=True).sort_values('week_label')
+        weekly_combined['cpr'] = weekly_combined.apply(lambda x: x['cost'] / x['register'] if x['register'] > 0 else 0, axis=1)
+        weekly_combined['cost_ftd'] = weekly_combined.apply(lambda x: x['cost'] / x['ftd'] if x['ftd'] > 0 else 0, axis=1)
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            fig = px.bar(weekly_combined, x='week_label', y='cost', color='channel', barmode='group',
+                        title='Weekly Cost',
+                        color_discrete_map={'Facebook': '#1877f2', 'Google': '#ea4335'})
+            fig.update_layout(height=350, xaxis_title="Week", yaxis_title="Cost (USD)")
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            fig = px.bar(weekly_combined, x='week_label', y='register', color='channel', barmode='group',
+                        title='Weekly Register',
+                        color_discrete_map={'Facebook': '#1877f2', 'Google': '#ea4335'})
+            fig.update_layout(height=350, xaxis_title="Week", yaxis_title="Register")
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col3:
+            fig = px.bar(weekly_combined, x='week_label', y='ftd', color='channel', barmode='group',
+                        title='Weekly FTD',
+                        color_discrete_map={'Facebook': '#1877f2', 'Google': '#ea4335'})
+            fig.update_layout(height=350, xaxis_title="Week", yaxis_title="FTD")
+            st.plotly_chart(fig, use_container_width=True)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            fig = px.bar(weekly_combined, x='week_label', y='cpr', color='channel', barmode='group',
+                        title='Weekly CPR',
+                        color_discrete_map={'Facebook': '#1877f2', 'Google': '#ea4335'})
+            fig.update_layout(height=350, xaxis_title="Week", yaxis_title="CPR (USD)")
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            fig = px.bar(weekly_combined, x='week_label', y='cost_ftd', color='channel', barmode='group',
+                        title='Weekly Cost/FTD',
+                        color_discrete_map={'Facebook': '#1877f2', 'Google': '#ea4335'})
+            fig.update_layout(height=350, xaxis_title="Week", yaxis_title="Cost/FTD (USD)")
+            st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("---")
+
+    # Monthly Summary
+    st.markdown('<div class="section-header"><h3>📊 MONTHLY SUMMARY</h3></div>', unsafe_allow_html=True)
+
+    monthly_data = []
+    if has_fb and not fb_df.empty:
+        fb_monthly = fb_df.copy()
+        fb_monthly['month'] = fb_monthly['date'].dt.to_period('M').astype(str)
+        fb_m = fb_monthly.groupby('month').agg({'cost': 'sum', 'ftd': 'sum', 'register': 'sum', 'ftd_recharge': 'sum'}).reset_index()
+        fb_m['channel'] = 'Facebook'
+        fb_m['roas'] = fb_m.apply(lambda x: x['ftd_recharge'] / x['cost'] if x['cost'] > 0 else 0, axis=1)
+        monthly_data.append(fb_m)
+
+    if has_google and not google_df.empty:
+        g_monthly = google_df.copy()
+        g_monthly['month'] = g_monthly['date'].dt.to_period('M').astype(str)
+        g_m = g_monthly.groupby('month').agg({'cost': 'sum', 'ftd': 'sum', 'register': 'sum', 'ftd_recharge': 'sum'}).reset_index()
+        g_m['channel'] = 'Google'
+        g_m['roas'] = g_m.apply(lambda x: x['ftd_recharge'] / x['cost'] if x['cost'] > 0 else 0, axis=1)
+        monthly_data.append(g_m)
+
+    if monthly_data:
+        monthly_combined = pd.concat(monthly_data, ignore_index=True).sort_values('month')
+        monthly_combined['cpr'] = monthly_combined.apply(lambda x: x['cost'] / x['register'] if x['register'] > 0 else 0, axis=1)
+        monthly_combined['cost_ftd'] = monthly_combined.apply(lambda x: x['cost'] / x['ftd'] if x['ftd'] > 0 else 0, axis=1)
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            fig = px.bar(monthly_combined, x='month', y='cost', color='channel', barmode='group',
+                        title='Monthly Cost',
+                        color_discrete_map={'Facebook': '#1877f2', 'Google': '#ea4335'})
+            fig.update_layout(height=350, xaxis_title="Month", yaxis_title="Cost (USD)")
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            fig = px.bar(monthly_combined, x='month', y='register', color='channel', barmode='group',
+                        title='Monthly Register',
+                        color_discrete_map={'Facebook': '#1877f2', 'Google': '#ea4335'})
+            fig.update_layout(height=350, xaxis_title="Month", yaxis_title="Register")
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col3:
+            fig = px.bar(monthly_combined, x='month', y='ftd', color='channel', barmode='group',
+                        title='Monthly FTD',
+                        color_discrete_map={'Facebook': '#1877f2', 'Google': '#ea4335'})
+            fig.update_layout(height=350, xaxis_title="Month", yaxis_title="FTD")
+            st.plotly_chart(fig, use_container_width=True)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            fig = px.bar(monthly_combined, x='month', y='cpr', color='channel', barmode='group',
+                        title='Monthly CPR',
+                        color_discrete_map={'Facebook': '#1877f2', 'Google': '#ea4335'})
+            fig.update_layout(height=350, xaxis_title="Month", yaxis_title="CPR (USD)")
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            fig = px.bar(monthly_combined, x='month', y='cost_ftd', color='channel', barmode='group',
+                        title='Monthly Cost/FTD',
+                        color_discrete_map={'Facebook': '#1877f2', 'Google': '#ea4335'})
+            fig.update_layout(height=350, xaxis_title="Month", yaxis_title="Cost/FTD (USD)")
+            st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("---")
+
+    # Data tables
+    st.markdown('<div class="section-header"><h3>📋 DETAILED DATA</h3></div>', unsafe_allow_html=True)
+
+    tab1, tab2 = st.tabs(["📘 Facebook Data", "🔍 Google Data"])
+
+    with tab1:
+        if has_fb and not fb_df.empty:
+            display_df = fb_df[['date', 'register', 'ftd', 'ftd_recharge', 'cost', 'cpr', 'roas']].copy()
+            display_df['date'] = display_df['date'].dt.strftime('%Y-%m-%d')
+            display_df = display_df.sort_values('date', ascending=False)
+            display_df.columns = ['Date', 'Register', 'FTD', 'Recharge (PHP)', 'Cost (USD)', 'CPR', 'ROAS']
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+            st.download_button("📥 Download FB CSV", display_df.to_csv(index=False), f"fb_daily_roi_{datetime.now():%Y%m%d}.csv")
+        else:
+            st.info("No Facebook data available")
+
+    with tab2:
+        if has_google and not google_df.empty:
+            display_df = google_df[['date', 'register', 'ftd', 'ftd_recharge', 'cost', 'cpr', 'roas']].copy()
+            display_df['date'] = display_df['date'].dt.strftime('%Y-%m-%d')
+            display_df = display_df.sort_values('date', ascending=False)
+            display_df.columns = ['Date', 'Register', 'FTD', 'Recharge (PHP)', 'Cost (USD)', 'CPR', 'ROAS']
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+            st.download_button("📥 Download Google CSV", display_df.to_csv(index=False), f"google_daily_roi_{datetime.now():%Y%m%d}.csv")
+        else:
+            st.info("No Google Daily ROI data available")
+
+    st.caption(f"Daily ROI Dashboard | {date_from} to {date_to}")
+
+
+if __name__ == "__main__":
+    main()

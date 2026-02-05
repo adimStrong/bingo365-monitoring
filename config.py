@@ -237,3 +237,87 @@ TELEGRAM_MENTIONS = {
     "MIKA": "CrWn365",
     "JOMAR": "HappyAllDaze",
 }
+
+# ============================================================
+# CHANNEL ROI DASHBOARD CONFIGURATION
+# ============================================================
+CHANNEL_ROI_ENABLED = True
+CHANNEL_ROI_SHEET_ID = "1P6GoOQUa7FdiGKPLJiytMzYvkRJwt7jPmqqHo0p0p0c"
+CHANNEL_ROI_SERVICE_ACCOUNT = "juan365-reporter@juan365-reporter.iam.gserviceaccount.com"
+
+# Sheet names and GIDs
+CHANNEL_FB_SHEET = {"name": "FB Summary", "gid": 1984146178}
+CHANNEL_GOOGLE_SHEET = {"name": "Google Summary", "gid": 667960594}
+
+# Date format in sheets (e.g., 9/21/2025)
+CHANNEL_DATE_FORMAT = "%m/%d/%Y"
+
+# Google report section headers (for parsing multi-section sheet)
+GOOGLE_REPORT_SECTIONS = [
+    "GOOGLE CHANNEL REPORT (DAILY ROI)",
+    "GOOGLE CHANNEL REPORT (ROLL BACK)",
+    "GOOGLE CHANNEL REPORT (VIOLET)",
+]
+
+# Column mapping for FB Summary sheet (actual structure from sheet)
+# Row 3 has headers, data starts at row 5
+# Columns: DATE, COST, REGISTER, FIRST DEPOSIT, FTD RECHARGE (P), AVG RECHARGE, Conv Ratio, CPR, CPFTD, ROAS, CPM
+CHANNEL_FB_COLUMNS = {
+    'date': 1,              # B - DATE
+    'cost': 2,              # C - COST (USD)
+    'register': 3,          # D - REGISTER
+    'ftd': 4,               # E - FIRST DEPOSIT
+    'ftd_recharge': 5,      # F - FTD RECHARGE (PHP)
+    'avg_recharge': 6,      # G - AVG RECHARGE
+    'conversion_ratio': 7,  # H - Conversion Ratio %
+    'cpr': 8,               # I - COST PER REGISTER
+    'cpftd': 9,             # J - COST PER FTD
+    'roas': 10,             # K - ROAS
+    'cpm': 11,              # L - COST CPM
+}
+CHANNEL_FB_HEADER_ROW = 3   # Row index (1-based) where headers are
+CHANNEL_FB_DATA_START_ROW = 5  # Row index (1-based) where data starts
+
+# Column mapping for Google Summary sheet - 3 sections in different columns
+# DAILY ROI: Columns B-L (index 1-11)
+CHANNEL_GOOGLE_DAILY_ROI_COLUMNS = {
+    'date': 1,              # B - DATE
+    'cost': 2,              # C - COST (USD)
+    'register': 3,          # D - REGISTER
+    'ftd': 4,               # E - FIRST DEPOSIT
+    'ftd_recharge': 5,      # F - FTD RECHARGE (PHP)
+    'avg_recharge': 6,      # G - AVG RECHARGE
+    'conversion_ratio': 7,  # H - Conversion Ratio %
+    'cpr': 8,               # I - COST PER REGISTER
+    'cpftd': 9,             # J - COST PER FTD
+    'roas': 10,             # K - ROAS
+    'cpm': 11,              # L - COST CPM
+}
+
+# ROLL BACK: Columns N-W (index 13-22)
+CHANNEL_GOOGLE_ROLL_BACK_COLUMNS = {
+    'date': 13,             # N - DATE
+    'cost': 14,             # O - COST (USD)
+    'register': 15,         # P - REGISTER
+    'ftd': 16,              # Q - FIRST DEPOSIT
+    'ftd_recharge': 17,     # R - FTD RECHARGE (PHP)
+    'avg_recharge': 18,     # S - AVG RECHARGE
+    'cpr': 19,              # T - COST PER REGISTER
+    'cpftd': 20,            # U - COST PER FTD
+    'roas': 21,             # V - ROAS
+    'cpm': 22,              # W - COST CPM
+}
+
+# VIOLET: Columns Y-AE (index 24-30) - Different structure!
+CHANNEL_GOOGLE_VIOLET_COLUMNS = {
+    'date': 24,             # Y - DATE
+    'ftd': 25,              # Z - FIRST RECHARGE (using as FTD)
+    'ftd_recharge': 26,     # AA - RECHARGE AMOUNT
+    'avg_recharge': 27,     # AB - ARPPU
+    'cost': 28,             # AC - COST
+    'cpr': 29,              # AD - COST PER RECHARGE
+    'roas': 30,             # AE - ROAS
+}
+
+# Legacy alias for backward compatibility
+CHANNEL_GOOGLE_COLUMNS = CHANNEL_GOOGLE_DAILY_ROI_COLUMNS
