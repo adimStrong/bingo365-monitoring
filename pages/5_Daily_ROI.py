@@ -57,8 +57,9 @@ def main():
 
     # Load data
     with st.spinner("Loading data..."):
-        fb_df = load_fb_channel_data()
+        fb_data = load_fb_channel_data()
         google_data = load_google_channel_data()
+        fb_df = fb_data.get('daily_roi', pd.DataFrame())
         google_df = google_data.get('daily_roi', pd.DataFrame())
 
     # Check data availability

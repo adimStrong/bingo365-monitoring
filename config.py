@@ -259,10 +259,13 @@ GOOGLE_REPORT_SECTIONS = [
     "GOOGLE CHANNEL REPORT (VIOLET)",
 ]
 
-# Column mapping for FB Summary sheet (actual structure from sheet)
+# Column mapping for FB Summary sheet - 3 sections in different columns
 # Row 3 has headers, data starts at row 5
-# Columns: DATE, COST, REGISTER, FIRST DEPOSIT, FTD RECHARGE (P), AVG RECHARGE, Conv Ratio, CPR, CPFTD, ROAS, CPM
-CHANNEL_FB_COLUMNS = {
+CHANNEL_FB_HEADER_ROW = 3   # Row index (1-based) where headers are
+CHANNEL_FB_DATA_START_ROW = 5  # Row index (1-based) where data starts
+
+# FB DAILY ROI: Columns B-L (index 1-11)
+CHANNEL_FB_DAILY_ROI_COLUMNS = {
     'date': 1,              # B - DATE
     'cost': 2,              # C - COST (USD)
     'register': 3,          # D - REGISTER
@@ -275,8 +278,35 @@ CHANNEL_FB_COLUMNS = {
     'roas': 10,             # K - ROAS
     'cpm': 11,              # L - COST CPM
 }
-CHANNEL_FB_HEADER_ROW = 3   # Row index (1-based) where headers are
-CHANNEL_FB_DATA_START_ROW = 5  # Row index (1-based) where data starts
+
+# FB ROLL BACK: Columns N-X (index 13-23)
+CHANNEL_FB_ROLL_BACK_COLUMNS = {
+    'date': 13,             # N - DATE
+    'cost': 14,             # O - COST (USD)
+    'register': 15,         # P - REGISTER
+    'ftd': 16,              # Q - FIRST DEPOSIT
+    'ftd_recharge': 17,     # R - FTD RECHARGE (PHP)
+    'avg_recharge': 18,     # S - AVG RECHARGE
+    'conversion_ratio': 19, # T - Conversion Ratio
+    'cpr': 20,              # U - COST PER REGISTER
+    'cpftd': 21,            # V - COST PER FTD
+    'roas': 22,             # W - ROAS
+    'cpm': 23,              # X - COST CPM
+}
+
+# FB VIOLET: Columns Z-AF (index 25-31)
+CHANNEL_FB_VIOLET_COLUMNS = {
+    'date': 25,             # Z - DATE
+    'ftd': 26,              # AA - FIRST RECHARGE
+    'ftd_recharge': 27,     # AB - RECHARGE AMOUNT
+    'avg_recharge': 28,     # AC - ARPPU
+    'cost': 29,             # AD - COST
+    'cpr': 30,              # AE - COST PER RECHARGE
+    'roas': 31,             # AF - ROAS
+}
+
+# Legacy alias for backward compatibility
+CHANNEL_FB_COLUMNS = CHANNEL_FB_DAILY_ROI_COLUMNS
 
 # Column mapping for Google Summary sheet - 3 sections in different columns
 # DAILY ROI: Columns B-L (index 1-11)

@@ -16,7 +16,9 @@ from config import (
     CHANNEL_ROI_SHEET_ID, CHANNEL_ROI_SERVICE_ACCOUNT,
     CHANNEL_FB_SHEET, CHANNEL_GOOGLE_SHEET,
     CHANNEL_DATE_FORMAT, GOOGLE_REPORT_SECTIONS,
-    CHANNEL_FB_COLUMNS,
+    CHANNEL_FB_DAILY_ROI_COLUMNS,
+    CHANNEL_FB_ROLL_BACK_COLUMNS,
+    CHANNEL_FB_VIOLET_COLUMNS,
     CHANNEL_GOOGLE_DAILY_ROI_COLUMNS,
     CHANNEL_GOOGLE_ROLL_BACK_COLUMNS,
     CHANNEL_GOOGLE_VIOLET_COLUMNS,
@@ -166,84 +168,129 @@ def get_section_name(row):
 @st.cache_data(ttl=300)  # Cache for 5 minutes
 def load_fb_channel_data():
     """
-    Load Facebook Summary daily data from Google Sheet.
+    Load Facebook Summary with 3 report sections from Google Sheet.
 
-    Actual sheet structure (FB Summary):
-    - Row 2: Section header "FACEBOOK CHANNEL REPORT (DAILY ROI)"
-    - Row 3: Column headers (DATE, COST, REGISTER, FIRST DEPOSIT, etc.)
-    - Row 5+: Data rows (starting at CHANNEL_FB_DATA_START_ROW)
-    - Columns start at B (index 1)
+    The sheet has 3 sections in DIFFERENT COLUMNS:
+    1. DAILY ROI: Columns B-L (index 1-11)
+    2. ROLL BACK: Columns N-X (index 13-23)
+    3. VIOLET: Columns Z-AF (index 25-31)
+
+    Data starts at row 5 (index 4).
 
     Returns:
-        DataFrame with columns: date, register, ftd, ftd_recharge,
-        avg_recharge, conversion_ratio, cost, cpr, cpftd, roas, cpm
+        dict: {'daily_roi': DataFrame, 'roll_back': DataFrame, 'violet': DataFrame}
     """
     try:
         client = get_google_client()
         if client is None:
-            return pd.DataFrame()
+            return {'daily_roi': pd.DataFrame(), 'roll_back': pd.DataFrame(), 'violet': pd.DataFrame()}
 
         spreadsheet = client.open_by_key(CHANNEL_ROI_SHEET_ID)
         worksheet = spreadsheet.worksheet(CHANNEL_FB_SHEET['name'])
 
         all_data = worksheet.get_all_values()
 
-        # Data starts at CHANNEL_FB_DATA_START_ROW (1-based, so subtract 1 for 0-based index)
+        # Data starts at row 5 (index 4)
         data_start_idx = CHANNEL_FB_DATA_START_ROW - 1
 
         if len(all_data) <= data_start_idx:
-            print(f"[WARNING] FB Summary sheet has no data (only {len(all_data)} rows, need {data_start_idx + 1})")
-            return pd.DataFrame()
+            print("[WARNING] FB Summary sheet has no data")
+            return {'daily_roi': pd.DataFrame(), 'roll_back': pd.DataFrame(), 'violet': pd.DataFrame()}
 
-        # Get data rows starting from the correct position
         data_rows = all_data[data_start_idx:]
+        result = {}
 
+        # Parse FB DAILY ROI (Columns B-L)
+        cols = CHANNEL_FB_DAILY_ROI_COLUMNS
         records = []
-        cols = CHANNEL_FB_COLUMNS
-
-        for row_idx, row in enumerate(data_rows):
-            # Need enough columns (at least up to the highest column index)
-            max_col = max(cols.values())
-            if len(row) <= max_col:
+        for row in data_rows:
+            if len(row) <= max(cols.values()):
                 continue
-
-            # Parse date from the 'date' column (index 1 = column B)
             date_val = parse_date(row[cols['date']])
             if not date_val:
                 continue
-
-            # Get cost to check if this is a valid data row
-            cost_val = parse_numeric(row[cols['cost']])
-
             records.append({
                 'date': date_val,
                 'register': int(parse_numeric(row[cols['register']])),
                 'ftd': int(parse_numeric(row[cols['ftd']])),
                 'ftd_recharge': parse_numeric(row[cols['ftd_recharge']]),
                 'avg_recharge': parse_numeric(row[cols['avg_recharge']]),
-                'conversion_ratio': parse_numeric(row[cols['conversion_ratio']]),
-                'cost': cost_val,
+                'conversion_ratio': parse_numeric(row[cols.get('conversion_ratio', 7)]) if 'conversion_ratio' in cols else 0,
+                'cost': parse_numeric(row[cols['cost']]),
                 'cpr': parse_numeric(row[cols['cpr']]),
-                'cpftd': parse_numeric(row[cols['cpftd']]),
+                'cpftd': parse_numeric(row[cols.get('cpftd', 9)]) if 'cpftd' in cols else 0,
                 'roas': parse_numeric(row[cols['roas']]),
-                'cpm': parse_numeric(row[cols['cpm']]),
+                'cpm': parse_numeric(row[cols.get('cpm', 11)]) if 'cpm' in cols else 0,
                 'channel': 'Facebook',
-                'deposit_amount': parse_numeric(row[cols['ftd_recharge']]),  # For compatibility
+                'section': 'daily_roi',
+                'deposit_amount': parse_numeric(row[cols['ftd_recharge']]),
             })
+        result['daily_roi'] = pd.DataFrame(records) if records else pd.DataFrame()
+        print(f"[OK] Loaded {len(records)} FB Daily ROI records")
 
-        if not records:
-            print("[WARNING] No valid records found in FB Summary")
-            return pd.DataFrame()
+        # Parse FB ROLL BACK (Columns N-X)
+        cols = CHANNEL_FB_ROLL_BACK_COLUMNS
+        records = []
+        for row in data_rows:
+            if len(row) <= max(cols.values()):
+                continue
+            date_val = parse_date(row[cols['date']])
+            if not date_val:
+                continue
+            records.append({
+                'date': date_val,
+                'register': int(parse_numeric(row[cols['register']])),
+                'ftd': int(parse_numeric(row[cols['ftd']])),
+                'ftd_recharge': parse_numeric(row[cols['ftd_recharge']]),
+                'avg_recharge': parse_numeric(row[cols['avg_recharge']]),
+                'conversion_ratio': parse_numeric(row[cols.get('conversion_ratio', 19)]) if 'conversion_ratio' in cols else 0,
+                'cost': parse_numeric(row[cols['cost']]),
+                'cpr': parse_numeric(row[cols['cpr']]),
+                'cpftd': parse_numeric(row[cols.get('cpftd', 21)]) if 'cpftd' in cols else 0,
+                'roas': parse_numeric(row[cols['roas']]),
+                'cpm': parse_numeric(row[cols.get('cpm', 23)]) if 'cpm' in cols else 0,
+                'channel': 'Facebook',
+                'section': 'roll_back',
+                'deposit_amount': parse_numeric(row[cols['ftd_recharge']]),
+            })
+        result['roll_back'] = pd.DataFrame(records) if records else pd.DataFrame()
+        print(f"[OK] Loaded {len(records)} FB Roll Back records")
 
-        df = pd.DataFrame(records)
-        print(f"[OK] Loaded {len(df)} FB Summary records")
-        return df
+        # Parse FB VIOLET (Columns Z-AF) - Different structure!
+        cols = CHANNEL_FB_VIOLET_COLUMNS
+        records = []
+        for row in data_rows:
+            if len(row) <= max(cols.values()):
+                continue
+            date_val = parse_date(row[cols['date']])
+            if not date_val:
+                continue
+            records.append({
+                'date': date_val,
+                'register': 0,  # Violet doesn't have register
+                'ftd': int(parse_numeric(row[cols['ftd']])),  # FIRST RECHARGE
+                'ftd_recharge': parse_numeric(row[cols['ftd_recharge']]),  # RECHARGE AMOUNT
+                'avg_recharge': parse_numeric(row[cols['avg_recharge']]),  # ARPPU
+                'conversion_ratio': 0,
+                'cost': parse_numeric(row[cols['cost']]),
+                'cpr': parse_numeric(row[cols['cpr']]),  # COST PER RECHARGE
+                'cpftd': 0,
+                'roas': parse_numeric(row[cols['roas']]),
+                'cpm': 0,
+                'channel': 'Facebook',
+                'section': 'violet',
+                'deposit_amount': parse_numeric(row[cols['ftd_recharge']]),
+            })
+        result['violet'] = pd.DataFrame(records) if records else pd.DataFrame()
+        print(f"[OK] Loaded {len(records)} FB Violet records")
+
+        return result
 
     except Exception as e:
         print(f"[ERROR] Failed to load FB channel data: {e}")
         import traceback
         traceback.print_exc()
-        return pd.DataFrame()
+        return {'daily_roi': pd.DataFrame(), 'roll_back': pd.DataFrame(), 'violet': pd.DataFrame()}
 
 
 @st.cache_data(ttl=300)  # Cache for 5 minutes
@@ -383,11 +430,11 @@ def combine_all_channel_data():
     """
     all_data = []
 
-    # Load FB data
-    fb_df = load_fb_channel_data()
-    if not fb_df.empty:
-        fb_df['section'] = 'FB Summary'
-        all_data.append(fb_df)
+    # Load FB data (now returns dict with 3 sections)
+    fb_data = load_fb_channel_data()
+    for key, df in fb_data.items():
+        if not df.empty:
+            all_data.append(df)
 
     # Load Google data
     google_data = load_google_channel_data()
