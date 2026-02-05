@@ -341,8 +341,8 @@ def generate_text_summary(current_data, latest_date, changes=None, low_spend_age
     # Agent Summary Table
     report += "👥 <b>AGENT SUMMARY</b>\n"
     report += "<pre>"
-    report += f"{'Agent':<8}{'Spend':>9}{'Reg':>5}{'FTD':>5}{'Conv':>6}\n"
-    report += "-" * 33 + "\n"
+    report += f"{'Agent':<8}{'Spend':>10}{'Reg':>6}{'FTD':>6}{'Conv':>6}\n"
+    report += "-" * 36 + "\n"
 
     # Get agent data sorted by spend
     agent_data = current_data.groupby('person_name').agg({
@@ -357,19 +357,41 @@ def generate_text_summary(current_data, latest_date, changes=None, low_spend_age
         ftd = int(row['result_ftd'])
         agent_conv = (ftd / reg * 100) if reg > 0 else 0
 
-        # Change indicator
+        # Change indicators with actual amounts
         if changes and agent_name in changes:
             spend_diff = changes[agent_name]['spend_diff']
-            if spend_diff > 0:
-                indicator = "↑"
-            elif spend_diff < 0:
-                indicator = "↓"
-            else:
-                indicator = "─"
-        else:
-            indicator = " "
+            reg_diff = changes[agent_name]['reg_diff']
+            ftd_diff = changes[agent_name]['ftd_diff']
 
-        report += f"{agent_name:<8}${spend:>7,.0f}{indicator}{reg:>5}{ftd:>5}{agent_conv:>5.1f}%\n"
+            # Format spend with change
+            if spend_diff > 0:
+                spend_str = f"${spend:,.0f}+{spend_diff:.0f}"
+            elif spend_diff < 0:
+                spend_str = f"${spend:,.0f}{spend_diff:.0f}"
+            else:
+                spend_str = f"${spend:,.0f}"
+
+            # Format reg with change
+            if reg_diff > 0:
+                reg_str = f"{reg}+{reg_diff}"
+            elif reg_diff < 0:
+                reg_str = f"{reg}{reg_diff}"
+            else:
+                reg_str = f"{reg}"
+
+            # Format ftd with change
+            if ftd_diff > 0:
+                ftd_str = f"{ftd}+{ftd_diff}"
+            elif ftd_diff < 0:
+                ftd_str = f"{ftd}{ftd_diff}"
+            else:
+                ftd_str = f"{ftd}"
+        else:
+            spend_str = f"${spend:,.0f}"
+            reg_str = f"{reg}"
+            ftd_str = f"{ftd}"
+
+        report += f"{agent_name:<8}{spend_str:>10}{reg_str:>6}{ftd_str:>6}{agent_conv:>5.1f}%\n"
 
     report += "</pre>\n\n"
 
