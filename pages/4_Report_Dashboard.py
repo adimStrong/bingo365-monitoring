@@ -159,6 +159,29 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
+    # Send Report Button
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 3])
+    with col_btn1:
+        if st.button("📤 Send to Telegram", type="primary", use_container_width=True):
+            try:
+                from realtime_reporter import send_realtime_report
+                with st.spinner("Sending report to Telegram..."):
+                    success = send_realtime_report(send_screenshot=False, send_text=True, combined=False)
+                    if success:
+                        st.success("✅ Report sent!")
+                    else:
+                        st.error("❌ Failed to send")
+            except ValueError as e:
+                st.error(f"⚠️ Telegram not configured: {e}")
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
+    with col_btn2:
+        if st.button("🔄 Refresh Data", type="secondary", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+
+    st.markdown("")  # Spacer
+
     # Load data
     with st.spinner("Loading data..."):
         fb_ads_df = load_facebook_ads_data()

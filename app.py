@@ -198,15 +198,24 @@ def main():
         st.cache_data.clear()
         st.rerun()
 
-    # Send Daily Report button
-    if st.sidebar.button("📤 Send Daily Report", type="secondary"):
+    # Send Real-Time Report button
+    if st.sidebar.button("📤 Send Report to Telegram", type="secondary"):
         try:
-            from daily_report import generate_daily_report
+            from realtime_reporter import send_realtime_report, generate_text_summary, get_latest_date_data, load_previous_report, compare_with_previous, check_low_spend, detect_no_change_agents
+            from config import NO_CHANGE_ALERT
+
             with st.spinner("Generating and sending report to Telegram..."):
-                report = generate_daily_report(send_to_telegram=True)
-                st.sidebar.success("✅ Report sent to Telegram!")
-                with st.sidebar.expander("Preview Report"):
-                    st.code(report, language=None)
+                # Get data
+                current_data, latest_date = get_latest_date_data()
+                if current_data is None or current_data.empty:
+                    st.sidebar.error("No data available")
+                else:
+                    # Send text-only report (screenshot not available on cloud)
+                    success = send_realtime_report(send_screenshot=False, send_text=True, combined=False)
+                    if success:
+                        st.sidebar.success("✅ Report sent to Telegram!")
+                    else:
+                        st.sidebar.error("❌ Failed to send report")
         except ValueError as e:
             st.sidebar.error(f"⚠️ Telegram not configured: {e}")
         except Exception as e:
