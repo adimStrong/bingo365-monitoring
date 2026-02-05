@@ -195,3 +195,39 @@ FACEBOOK_ADS_DATA_START_ROW = 4
 # Row where person names are located (0-indexed: row 1 = Row 2)
 # INDIVIDUAL KPI sheet has names in Row 2 (index 1)
 FACEBOOK_ADS_NAMES_ROW = 1
+
+# ============================================================
+# REAL-TIME REPORT CONFIGURATION
+# ============================================================
+REALTIME_REPORT_ENABLED = True
+
+# Send times for real-time reports (7 times daily)
+REALTIME_SEND_TIMES = [
+    {"hour": 6, "minute": 0, "label": "6:00 AM"},
+    {"hour": 9, "minute": 0, "label": "9:00 AM"},
+    {"hour": 13, "minute": 0, "label": "1:00 PM"},
+    {"hour": 17, "minute": 0, "label": "5:00 PM"},
+    {"hour": 20, "minute": 30, "label": "8:30 PM"},
+    {"hour": 23, "minute": 0, "label": "11:00 PM"},
+    {"hour": 3, "minute": 0, "label": "3:00 AM"},
+]
+
+# Alert thresholds
+LOW_SPEND_THRESHOLD_USD = 100  # Alert if daily spend < $100
+NO_CHANGE_ALERT = True  # Alert if no change between periods
+
+# Screenshot settings
+DASHBOARD_URL = "http://localhost:8501/Report_Dashboard"
+SCREENSHOT_DIR = "reports/screenshots"
+
+# Last report data file (for change detection)
+LAST_REPORT_DATA_FILE = "last_report_data.json"
+
+# Facebook Ads persons for reports
+FACEBOOK_ADS_PERSONS = ["JASON", "RON", "SHILA", "ADRIAN", "JOMAR", "KRISSA", "MIKA", "DER"]
+
+# Telegram mentions for alerts (username without @)
+TELEGRAM_MENTIONS = {
+    "JASON": "xxxadsron",
+    "RON": "Adsbasty",
+}

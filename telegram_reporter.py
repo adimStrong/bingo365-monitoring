@@ -92,6 +92,40 @@ class TelegramReporter:
             response = requests.post(url, data=data, files=files, timeout=60)
             return response.json()
 
+    def send_photo(self, photo_path, caption=None, parse_mode='HTML'):
+        """
+        Send a photo to Telegram
+
+        Args:
+            photo_path: Path to photo file to send
+            caption: Optional caption for the photo (supports HTML/Markdown)
+            parse_mode: 'HTML' or 'Markdown'
+
+        Returns:
+            dict: Telegram API response
+        """
+        url = f"{self.base_url}/sendPhoto"
+
+        try:
+            with open(photo_path, 'rb') as f:
+                files = {'photo': f}
+                data = {'chat_id': self.chat_id}
+                if caption:
+                    data['caption'] = caption
+                    data['parse_mode'] = parse_mode
+
+                response = requests.post(url, data=data, files=files, timeout=60)
+                result = response.json()
+
+                if not result.get('ok'):
+                    error_desc = result.get('description', 'Unknown error')
+                    raise Exception(f"Telegram API error: {error_desc}")
+
+                return result
+
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"Failed to send Telegram photo: {e}")
+
 
 def test_connection():
     """Test Telegram connection"""
