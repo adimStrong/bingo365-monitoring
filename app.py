@@ -388,6 +388,7 @@ def render_overview(running_ads_df, creative_df, sms_df, content_df, fb_ads_df=N
         # Calculate derived metrics
         agent_summary['cpr'] = (agent_summary['spend'] / agent_summary['register']).round(2)
         agent_summary['cpftd'] = (agent_summary['spend'] / agent_summary['result_ftd']).round(2)
+        agent_summary['conv_rate'] = (agent_summary['result_ftd'] / agent_summary['register'] * 100).round(1)
 
         # Handle inf/nan
         agent_summary = agent_summary.replace([float('inf'), float('-inf')], 0).fillna(0)
@@ -402,9 +403,10 @@ def render_overview(running_ads_df, creative_df, sms_df, content_df, fb_ads_df=N
             'register': 'Register',
             'result_ftd': 'FTD',
             'cpr': 'CPR',
-            'cpftd': 'Cost/FTD'
+            'cpftd': 'Cost/FTD',
+            'conv_rate': 'Conv %'
         })
-        agent_summary = agent_summary[['Agent', 'Spend', 'Register', 'FTD', 'CPR', 'Cost/FTD']]
+        agent_summary = agent_summary[['Agent', 'Spend', 'Register', 'FTD', 'CPR', 'Cost/FTD', 'Conv %']]
 
         # Convert to proper types
         agent_summary['Register'] = agent_summary['Register'].astype(int)
@@ -422,6 +424,7 @@ def render_overview(running_ads_df, creative_df, sms_df, content_df, fb_ads_df=N
                 "FTD": st.column_config.NumberColumn(format="%d"),
                 "CPR": st.column_config.NumberColumn(format="$ %.2f"),
                 "Cost/FTD": st.column_config.NumberColumn(format="$ %.2f"),
+                "Conv %": st.column_config.NumberColumn(format="%.1f%%"),
             }
         )
     else:
@@ -855,6 +858,7 @@ def render_facebook_ads(fb_ads_df):
         summary_df['CTR'] = (summary_df['clicks'] / summary_df['impressions'] * 100).round(2)
         summary_df['CPR'] = (summary_df['spend'] / summary_df['register']).round(2)
         summary_df['CPFTD'] = (summary_df['spend'] / summary_df['result_ftd']).round(2)
+        summary_df['Conv'] = (summary_df['result_ftd'] / summary_df['register'] * 100).round(1)
 
         # Clean up
         summary_df = summary_df.fillna(0)
@@ -864,7 +868,7 @@ def render_facebook_ads(fb_ads_df):
         summary_df = summary_df.sort_values('result_ftd', ascending=False)
 
         # Rename columns
-        summary_df.columns = ['Person', 'Spend', 'Impressions', 'Clicks', 'Reach', 'Register', 'FTD', 'CTR%', 'CPR', 'Cost/FTD']
+        summary_df.columns = ['Person', 'Spend', 'Impressions', 'Clicks', 'Reach', 'Register', 'FTD', 'CTR%', 'CPR', 'Cost/FTD', 'Conv %']
 
         st.dataframe(
             summary_df,
@@ -881,6 +885,7 @@ def render_facebook_ads(fb_ads_df):
                 "CTR%": st.column_config.NumberColumn(format="%.2f%%"),
                 "CPR": st.column_config.NumberColumn(format="$ %.2f"),
                 "Cost/FTD": st.column_config.NumberColumn(format="$ %.2f"),
+                "Conv %": st.column_config.NumberColumn(format="%.1f%%"),
             }
         )
     else:

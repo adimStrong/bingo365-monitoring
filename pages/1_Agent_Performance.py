@@ -374,7 +374,7 @@ with tab2:
 
         # Cost metrics
         st.subheader("💰 Cost Metrics")
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             st.metric("CPC", f"${avg_cpc:.2f}")
         with col2:
@@ -385,6 +385,9 @@ with tab2:
         with col4:
             cpftd = (total_spend / total_ftd) if total_ftd > 0 else 0
             st.metric("Cost/FTD", f"${cpftd:.2f}")
+        with col5:
+            conv_rate = (total_ftd / total_register * 100) if total_register > 0 else 0
+            st.metric("Conv Rate", f"{conv_rate:.1f}%")
 
         # Data table
         st.subheader("📋 Facebook Ads Data")
@@ -393,6 +396,11 @@ with tab2:
         available_cols = [col for col in display_cols if col in fb_ads_df.columns]
         display_fb = fb_ads_df[available_cols].copy()
         display_fb['date'] = pd.to_datetime(display_fb['date']).dt.strftime('%Y-%m-%d')
+        # Add conversion rate column
+        display_fb['conv_rate'] = (display_fb['result_ftd'] / display_fb['register'] * 100).round(1)
+        display_fb['conv_rate'] = display_fb['conv_rate'].fillna(0).replace([float('inf')], 0)
+        # Rename for display
+        display_fb = display_fb.rename(columns={'conv_rate': 'Conv %'})
         st.dataframe(display_fb, use_container_width=True, hide_index=True)
     else:
         st.info(f"No Facebook Ads data available for {selected_agent}.")
