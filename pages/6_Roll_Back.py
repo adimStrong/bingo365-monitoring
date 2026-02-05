@@ -1,6 +1,6 @@
 """
-Channel ROI - Roll Back
-Shows Facebook and Google Roll Back performance comparison
+Channel ROI - Roll Back (Google Only)
+Shows Google Roll Back performance data
 """
 import streamlit as st
 import pandas as pd
@@ -11,17 +11,13 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from channel_data_loader import load_fb_channel_data, load_google_channel_data, refresh_channel_data
+from channel_data_loader import load_google_channel_data, refresh_channel_data
 from config import CHANNEL_ROI_ENABLED
 
 st.set_page_config(page_title="Roll Back", page_icon="🔄", layout="wide")
 
 st.markdown("""
 <style>
-    .fb-card {
-        background: linear-gradient(135deg, #1877f2 0%, #42a5f5 100%);
-        padding: 20px; border-radius: 15px; color: white; text-align: center;
-    }
     .google-card {
         background: linear-gradient(135deg, #fbbc05 0%, #f9a825 100%);
         padding: 20px; border-radius: 15px; color: white; text-align: center;
@@ -48,20 +44,11 @@ def format_number(value):
 
 def main():
     st.title("🔄 Roll Back Dashboard")
-    st.markdown("Facebook vs Google - Roll Back Performance Comparison")
+    st.markdown("Google Roll Back Performance Data")
 
     if not CHANNEL_ROI_ENABLED:
         st.warning("Channel ROI Dashboard is disabled.")
         return
-
-    # Load data
-    with st.spinner("Loading data..."):
-        fb_df = load_fb_channel_data()  # FB data for comparison
-        google_data = load_google_channel_data()
-        google_df = google_data.get('roll_back', pd.DataFrame())
-
-    has_fb = not fb_df.empty
-    has_google = not google_df.empty
 
     # Sidebar
     with st.sidebar:
@@ -77,30 +64,13 @@ def main():
         st.page_link("pages/5_Daily_ROI.py", label="📊 Daily ROI", icon="📈")
         st.page_link("pages/7_Violet.py", label="💜 Violet", icon="📈")
 
-    # Check data availability
-    if not has_google:
-        st.warning("⚠️ No Google Roll Back data available in the source spreadsheet.")
-        st.info("The Roll Back section may not exist or have no data.")
+    # Load data
+    with st.spinner("Loading data..."):
+        google_data = load_google_channel_data()
+        google_df = google_data.get('roll_back', pd.DataFrame())
 
-        # Still show FB data if available
-        if has_fb:
-            st.markdown("---")
-            st.subheader("📘 Facebook Data Available")
-
-            fb_df['date'] = pd.to_datetime(fb_df['date'])
-            yesterday = datetime.now().date() - timedelta(days=1)
-            fb_df = fb_df[fb_df['date'].dt.date <= yesterday]
-
-            if not fb_df.empty:
-                totals = {
-                    'cost': fb_df['cost'].sum(),
-                    'register': fb_df['register'].sum(),
-                    'ftd': fb_df['ftd'].sum(),
-                }
-                col1, col2, col3 = st.columns(3)
-                col1.metric("💰 Cost", format_currency(totals['cost']))
-                col2.metric("📝 Register", format_number(totals['register']))
-                col3.metric("💳 FTD", format_number(totals['ftd']))
+    if google_df.empty:
+        st.warning("⚠️ No Google Roll Back data available.")
         return
 
     # Prepare dates
