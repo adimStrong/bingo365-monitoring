@@ -54,8 +54,9 @@ def send_scheduled_report():
             logger.info("Overnight report - sending text only")
             success = send_text_only_report()
         else:
-            # Regular report with screenshot
-            success = send_realtime_report(send_screenshot=True, send_text=True)
+            # Regular report with screenshot + text combined in 1 message
+            logger.info("Sending report with dashboard screenshot")
+            success = send_realtime_report(send_screenshot=True, send_text=True, combined=True)
 
         if success:
             logger.info("Scheduled report completed successfully")
