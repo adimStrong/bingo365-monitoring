@@ -378,6 +378,7 @@ def main():
                 # Calculate efficiency
                 cpr = spend / reg if reg > 0 else 0
                 cpftd = spend / ftd if ftd > 0 else 0
+                conv_rate = (ftd / reg * 100) if reg > 0 else 0
 
                 with col:
                     st.markdown(f"""
@@ -390,6 +391,7 @@ def main():
                         <p><strong>FTD:</strong> {ftd:,} <span class="{get_change_class(ftd_diff)}">{ftd_change}</span></p>
                         <p><strong>CPR:</strong> ${cpr:.2f}</p>
                         <p><strong>Cost/FTD:</strong> ${cpftd:.2f}</p>
+                        <p><strong>Conv:</strong> {conv_rate:.1f}%</p>
                     </div>
                     """, unsafe_allow_html=True)
 

@@ -485,6 +485,7 @@ def load_indian_promotion_content():
         return pd.DataFrame()
 
 
+@st.cache_data(ttl=600)  # Cache for 10 minutes
 def load_facebook_ads_data():
     """
     Load Facebook Ads data from INDIVIDUAL KPI sheet using service account authentication.

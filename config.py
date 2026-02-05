@@ -125,6 +125,9 @@ SIMILARITY_LOW = 0.50  # Some overlap
 PAGE_TITLE = "BINGO365 Daily Monitoring"
 PAGE_ICON = "🎰"
 
+# Data refresh interval (in minutes) for Facebook Ads data
+DATA_REFRESH_INTERVAL_MINUTES = 10
+
 # Content types
 CONTENT_TYPES = ["Primary Text", "Headline"]
 
