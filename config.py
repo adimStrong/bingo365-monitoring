@@ -202,7 +202,8 @@ FACEBOOK_ADS_NAMES_ROW = 1
 # ============================================================
 # REAL-TIME REPORT CONFIGURATION
 # ============================================================
-REALTIME_REPORT_ENABLED = True
+REALTIME_REPORT_ENABLED = False  # Disabled - Individual KPI sending stopped
+DAILY_REPORT_ENABLED = False  # Disabled - Individual KPI daily sending stopped
 
 # Send times for real-time reports (7 times daily)
 REALTIME_SEND_TIMES = [

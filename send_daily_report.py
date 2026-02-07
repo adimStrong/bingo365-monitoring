@@ -12,9 +12,14 @@ import requests
 from datetime import datetime, timedelta
 from data_loader import load_facebook_ads_data
 from daily_report import generate_facebook_ads_section
+from config import DAILY_REPORT_ENABLED
 
 def send_report():
     """Load data from INDIVIDUAL KPI sheet, generate report, and send to Telegram"""
+    if not DAILY_REPORT_ENABLED:
+        print("[DISABLED] Daily report sending is disabled in config.py")
+        return False
+
     print("Loading Facebook Ads data from INDIVIDUAL KPI sheet...")
     fb_ads_df = load_facebook_ads_data()
 
