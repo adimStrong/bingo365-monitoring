@@ -93,8 +93,10 @@ def render_overall_summary(overall_df):
     total_recharge = overall_df['first_recharge'].sum()
     total_amount = overall_df['total_amount'].sum()
     avg_arppu = total_amount / total_recharge if total_recharge > 0 else 0
+    avg_cpr = total_cost / total_reg if total_reg > 0 else 0
+    avg_cpfd = total_cost / total_recharge if total_recharge > 0 else 0
 
-    col1, col2, col3, col4, col5 = st.columns(5)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Total Cost", format_currency(total_cost))
     with col2:
@@ -103,8 +105,14 @@ def render_overall_summary(overall_df):
         st.metric("1st Recharge", format_number(total_recharge))
     with col4:
         st.metric("Total Amount", format_php(total_amount))
-    with col5:
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
         st.metric("Avg ARPPU", format_php(avg_arppu))
+    with col2:
+        st.metric("CPR (Cost/Reg)", format_currency(avg_cpr))
+    with col3:
+        st.metric("CPFD (Cost/1st Recharge)", format_currency(avg_cpfd))
 
 
 def render_team_comparison(overall_df):
@@ -121,6 +129,11 @@ def render_team_comparison(overall_df):
         'first_recharge': 'sum',
         'total_amount': 'sum',
     }).reset_index()
+
+    team_agg['cpr'] = team_agg.apply(
+        lambda x: x['cost'] / x['registrations'] if x['registrations'] > 0 else 0, axis=1)
+    team_agg['cpfd'] = team_agg.apply(
+        lambda x: x['cost'] / x['first_recharge'] if x['first_recharge'] > 0 else 0, axis=1)
 
     # Bar chart for key metrics
     col1, col2 = st.columns(2)
@@ -139,6 +152,24 @@ def render_team_comparison(overall_df):
                      title='1st Recharge by Team', text='first_recharge')
         fig.update_traces(texttemplate='%{text:,}', textposition='outside')
         fig.update_layout(height=350, xaxis_title="First Recharge", yaxis_title="")
+        st.plotly_chart(fig, use_container_width=True)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        fig = px.bar(team_agg.sort_values('cpr', ascending=True),
+                     x='cpr', y='team', orientation='h',
+                     title='CPR by Team ($)', text='cpr')
+        fig.update_traces(texttemplate='$%{text:,.2f}', textposition='outside')
+        fig.update_layout(height=350, xaxis_title="Cost per Registration (USD)", yaxis_title="")
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        fig = px.bar(team_agg.sort_values('cpfd', ascending=True),
+                     x='cpfd', y='team', orientation='h',
+                     title='CPFD by Team ($)', text='cpfd')
+        fig.update_traces(texttemplate='$%{text:,.2f}', textposition='outside')
+        fig.update_layout(height=350, xaxis_title="Cost per 1st Recharge (USD)", yaxis_title="")
         st.plotly_chart(fig, use_container_width=True)
 
     col1, col2 = st.columns(2)
@@ -170,6 +201,11 @@ def render_channel_breakdown(overall_df):
         'arppu': 'mean',
     }).reset_index()
 
+    channel_agg['cpr'] = channel_agg.apply(
+        lambda x: x['cost'] / x['registrations'] if x['registrations'] > 0 else 0, axis=1)
+    channel_agg['cpfd'] = channel_agg.apply(
+        lambda x: x['cost'] / x['first_recharge'] if x['first_recharge'] > 0 else 0, axis=1)
+
     col1, col2 = st.columns(2)
 
     with col1:
@@ -186,6 +222,24 @@ def render_channel_breakdown(overall_df):
                      title='1st Recharge by Channel', text='first_recharge')
         fig.update_traces(texttemplate='%{text:,}', textposition='outside')
         fig.update_layout(height=450, xaxis_title="First Recharge Count", yaxis_title="")
+        st.plotly_chart(fig, use_container_width=True)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        sorted_df = channel_agg.sort_values('cpr', ascending=True)
+        fig = px.bar(sorted_df, x='cpr', y='channel', orientation='h',
+                     title='CPR by Channel ($)', text='cpr')
+        fig.update_traces(texttemplate='$%{text:,.2f}', textposition='outside')
+        fig.update_layout(height=450, xaxis_title="Cost per Registration (USD)", yaxis_title="")
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        sorted_df = channel_agg.sort_values('cpfd', ascending=True)
+        fig = px.bar(sorted_df, x='cpfd', y='channel', orientation='h',
+                     title='CPFD by Channel ($)', text='cpfd')
+        fig.update_traces(texttemplate='$%{text:,.2f}', textposition='outside')
+        fig.update_layout(height=450, xaxis_title="Cost per 1st Recharge (USD)", yaxis_title="")
         st.plotly_chart(fig, use_container_width=True)
 
     col1, col2 = st.columns(2)
@@ -227,6 +281,10 @@ def render_daily_trends(daily_df):
 
     daily['roas'] = daily.apply(
         lambda x: x['total_amount'] / x['cost'] if x['cost'] > 0 else 0, axis=1)
+    daily['cpr'] = daily.apply(
+        lambda x: x['cost'] / x['registrations'] if x['registrations'] > 0 else 0, axis=1)
+    daily['cpfd'] = daily.apply(
+        lambda x: x['cost'] / x['first_recharge'] if x['first_recharge'] > 0 else 0, axis=1)
 
     col1, col2 = st.columns(2)
 
@@ -257,6 +315,22 @@ def render_daily_trends(daily_df):
         fig = px.line(daily, x='date_only', y='roas', color='channel',
                       markers=True, title='Daily ROAS')
         fig.update_layout(height=350, xaxis_title="Date", yaxis_title="ROAS",
+                          legend=dict(orientation="h", yanchor="bottom", y=-0.4))
+        st.plotly_chart(fig, use_container_width=True)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        fig = px.line(daily, x='date_only', y='cpr', color='channel',
+                      markers=True, title='Daily CPR ($)')
+        fig.update_layout(height=350, xaxis_title="Date", yaxis_title="Cost per Registration (USD)",
+                          legend=dict(orientation="h", yanchor="bottom", y=-0.4))
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        fig = px.line(daily, x='date_only', y='cpfd', color='channel',
+                      markers=True, title='Daily CPFD ($)')
+        fig.update_layout(height=350, xaxis_title="Date", yaxis_title="Cost per 1st Recharge (USD)",
                           legend=dict(orientation="h", yanchor="bottom", y=-0.4))
         st.plotly_chart(fig, use_container_width=True)
 
@@ -292,6 +366,10 @@ def render_weekly_summary(daily_df):
 
     weekly['roas'] = weekly.apply(
         lambda x: x['total_amount'] / x['cost'] if x['cost'] > 0 else 0, axis=1)
+    weekly['cpr'] = weekly.apply(
+        lambda x: x['cost'] / x['registrations'] if x['registrations'] > 0 else 0, axis=1)
+    weekly['cpfd'] = weekly.apply(
+        lambda x: x['cost'] / x['first_recharge'] if x['first_recharge'] > 0 else 0, axis=1)
 
     col1, col2 = st.columns(2)
 
@@ -325,6 +403,22 @@ def render_weekly_summary(daily_df):
                           legend=dict(orientation="h", yanchor="bottom", y=-0.3))
         st.plotly_chart(fig, use_container_width=True)
 
+    col1, col2 = st.columns(2)
+
+    with col1:
+        fig = px.bar(weekly, x='week_label', y='cpr', color='channel',
+                     barmode='group', title='Weekly CPR ($)')
+        fig.update_layout(height=400, xaxis_title="Week", yaxis_title="Cost per Registration (USD)",
+                          legend=dict(orientation="h", yanchor="bottom", y=-0.3))
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        fig = px.bar(weekly, x='week_label', y='cpfd', color='channel',
+                     barmode='group', title='Weekly CPFD ($)')
+        fig.update_layout(height=400, xaxis_title="Week", yaxis_title="Cost per 1st Recharge (USD)",
+                          legend=dict(orientation="h", yanchor="bottom", y=-0.3))
+        st.plotly_chart(fig, use_container_width=True)
+
 
 def render_monthly_summary(daily_df):
     """Render monthly summary grouped bar charts."""
@@ -346,6 +440,10 @@ def render_monthly_summary(daily_df):
 
     monthly['roas'] = monthly.apply(
         lambda x: x['total_amount'] / x['cost'] if x['cost'] > 0 else 0, axis=1)
+    monthly['cpr'] = monthly.apply(
+        lambda x: x['cost'] / x['registrations'] if x['registrations'] > 0 else 0, axis=1)
+    monthly['cpfd'] = monthly.apply(
+        lambda x: x['cost'] / x['first_recharge'] if x['first_recharge'] > 0 else 0, axis=1)
 
     col1, col2 = st.columns(2)
 
@@ -379,6 +477,22 @@ def render_monthly_summary(daily_df):
                           legend=dict(orientation="h", yanchor="bottom", y=-0.3))
         st.plotly_chart(fig, use_container_width=True)
 
+    col1, col2 = st.columns(2)
+
+    with col1:
+        fig = px.bar(monthly, x='month', y='cpr', color='channel',
+                     barmode='group', title='Monthly CPR ($)')
+        fig.update_layout(height=400, xaxis_title="Month", yaxis_title="Cost per Registration (USD)",
+                          legend=dict(orientation="h", yanchor="bottom", y=-0.3))
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        fig = px.bar(monthly, x='month', y='cpfd', color='channel',
+                     barmode='group', title='Monthly CPFD ($)')
+        fig.update_layout(height=400, xaxis_title="Month", yaxis_title="Cost per 1st Recharge (USD)",
+                          legend=dict(orientation="h", yanchor="bottom", y=-0.3))
+        st.plotly_chart(fig, use_container_width=True)
+
 
 def render_data_table(daily_df):
     """Render detailed data table with CSV download."""
@@ -393,7 +507,7 @@ def render_data_table(daily_df):
     display_df = display_df.sort_values('date', ascending=False)
 
     display_cols = ['date', 'channel', 'cost', 'registrations',
-                    'first_recharge', 'total_amount', 'arppu', 'roas']
+                    'first_recharge', 'total_amount', 'arppu', 'cpr', 'cpfd', 'roas']
     display_df = display_df[[c for c in display_cols if c in display_df.columns]].copy()
 
     # Format for display
@@ -402,11 +516,16 @@ def render_data_table(daily_df):
     display_df['first_recharge'] = display_df['first_recharge'].apply(lambda x: f"{x:,}")
     display_df['total_amount'] = display_df['total_amount'].apply(lambda x: f"₱{x:,.2f}")
     display_df['arppu'] = display_df['arppu'].apply(lambda x: f"₱{x:,.2f}")
+    if 'cpr' in display_df.columns:
+        display_df['cpr'] = display_df['cpr'].apply(lambda x: f"${x:,.2f}")
+    if 'cpfd' in display_df.columns:
+        display_df['cpfd'] = display_df['cpfd'].apply(lambda x: f"${x:,.2f}")
     if 'roas' in display_df.columns:
         display_df['roas'] = display_df['roas'].apply(lambda x: f"{x:.2f}")
 
     display_df.columns = ['Date', 'Channel', 'Cost ($)', 'Registrations',
-                           '1st Recharge', 'Total Amount (₱)', 'ARPPU (₱)', 'ROAS']
+                           '1st Recharge', 'Total Amount (₱)', 'ARPPU (₱)',
+                           'CPR ($)', 'CPFD ($)', 'ROAS']
 
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 

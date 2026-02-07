@@ -863,13 +863,17 @@ def load_team_channel_data():
 
         if not daily_df.empty:
             daily_df['date'] = pd.to_datetime(daily_df['date'])
-            daily_df['cost_per_recharge'] = daily_df.apply(
+            daily_df['cpr'] = daily_df.apply(
+                lambda x: x['cost'] / x['registrations'] if x['registrations'] > 0 else 0, axis=1)
+            daily_df['cpfd'] = daily_df.apply(
                 lambda x: x['cost'] / x['first_recharge'] if x['first_recharge'] > 0 else 0, axis=1)
             daily_df['roas'] = daily_df.apply(
                 lambda x: x['total_amount'] / x['cost'] if x['cost'] > 0 else 0, axis=1)
 
         if not overall_df.empty:
-            overall_df['cost_per_recharge'] = overall_df.apply(
+            overall_df['cpr'] = overall_df.apply(
+                lambda x: x['cost'] / x['registrations'] if x['registrations'] > 0 else 0, axis=1)
+            overall_df['cpfd'] = overall_df.apply(
                 lambda x: x['cost'] / x['first_recharge'] if x['first_recharge'] > 0 else 0, axis=1)
             overall_df['roas'] = overall_df.apply(
                 lambda x: x['total_amount'] / x['cost'] if x['cost'] > 0 else 0, axis=1)
