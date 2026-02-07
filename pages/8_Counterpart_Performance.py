@@ -502,10 +502,19 @@ def render_data_table(df, channel_name):
     display_df['date'] = pd.to_datetime(display_df['date']).dt.strftime('%Y-%m-%d')
     display_df = display_df.sort_values('date', ascending=False)
 
-    # Select and rename columns for display
+    # Select columns for display
     display_cols = ['date', 'channel', 'first_recharge', 'total_amount', 'arppu', 'spending', 'cost_per_recharge', 'roas']
     display_df = display_df[display_cols]
-    display_df.columns = ['Date', 'Channel', 'First Recharge', 'Total Recharge Amount', 'ARPPU', 'Spending', 'Cost/Recharge', 'ROAS']
+
+    # Format values with correct currency signs
+    display_df['total_amount'] = display_df['total_amount'].apply(lambda x: f"₱{x:,.2f}")
+    display_df['arppu'] = display_df['arppu'].apply(lambda x: f"₱{x:,.2f}")
+    display_df['spending'] = display_df['spending'].apply(lambda x: f"${x:,.2f}")
+    display_df['cost_per_recharge'] = display_df['cost_per_recharge'].apply(lambda x: f"${x:,.2f}")
+    display_df['first_recharge'] = display_df['first_recharge'].apply(lambda x: f"{x:,}")
+    display_df['roas'] = display_df['roas'].apply(lambda x: f"{x:.2f}")
+
+    display_df.columns = ['Date', 'Channel', 'First Recharge', 'Total Recharge Amount (₱)', 'ARPPU (₱)', 'Spending ($)', 'Cost/Recharge ($)', 'ROAS']
 
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 
