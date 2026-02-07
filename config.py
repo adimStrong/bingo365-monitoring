@@ -354,3 +354,34 @@ CHANNEL_GOOGLE_VIOLET_COLUMNS = {
 
 # Legacy alias for backward compatibility
 CHANNEL_GOOGLE_COLUMNS = CHANNEL_GOOGLE_DAILY_ROI_COLUMNS
+
+# ============================================================
+# COUNTERPART PERFORMANCE CONFIGURATION
+# ============================================================
+COUNTERPART_SHEET = {"name": "Counterpart Performance", "gid": 1424265282}
+
+# Header row and data start
+COUNTERPART_HEADER_ROW = 2  # Row where headers are
+COUNTERPART_DATA_START_ROW = 3  # Where daily data starts
+
+# Facebook Section: Columns B-H (index 1-7) - Column A is empty
+COUNTERPART_FB_COLUMNS = {
+    'channel_source': 1,      # B - Channel Source (渠道来源)
+    'first_recharge': 2,      # C - First Recharge Count (首充人数)
+    'total_amount': 3,        # D - Total Recharge Amount (总充值金额)
+    'arppu': 4,               # E - Avg ARPPU
+    'spending': 5,            # F - Spending/Cost (消耗)
+    'cost_per_recharge': 6,   # G - Cost per Recharge (首充成本)
+    'roas': 7,                # H - ROAS
+}
+
+# Google Section: Columns J-P (index 9-15)
+COUNTERPART_GOOGLE_COLUMNS = {
+    'channel_source': 9,      # J - Channel Source
+    'first_recharge': 10,     # K - First Recharge Count
+    'total_amount': 11,       # L - Total Recharge Amount
+    'arppu': 12,              # M - Avg ARPPU
+    'spending': 13,           # N - Spending/Cost
+    'cost_per_recharge': 14,  # O - Cost per Recharge
+    'roas': 15,               # P - ROAS
+}

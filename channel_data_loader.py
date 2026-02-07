@@ -23,7 +23,11 @@ from config import (
     CHANNEL_GOOGLE_ROLL_BACK_COLUMNS,
     CHANNEL_GOOGLE_VIOLET_COLUMNS,
     CHANNEL_FB_HEADER_ROW, CHANNEL_FB_DATA_START_ROW,
-    FACEBOOK_ADS_CREDENTIALS_FILE
+    FACEBOOK_ADS_CREDENTIALS_FILE,
+    COUNTERPART_SHEET,
+    COUNTERPART_FB_COLUMNS,
+    COUNTERPART_GOOGLE_COLUMNS,
+    COUNTERPART_DATA_START_ROW,
 )
 
 
@@ -592,6 +596,152 @@ def refresh_channel_data():
     """Clear cache to force data refresh."""
     load_fb_channel_data.clear()
     load_google_channel_data.clear()
+
+
+def is_date_header(text):
+    """Check if text is a date header like 'January 27' or 'February 1'."""
+    if not text or not isinstance(text, str):
+        return False
+    return bool(re.match(r'^(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}', text.strip()))
+
+
+def parse_date_header(text):
+    """Parse date header like 'January 27' to datetime."""
+    try:
+        # Add current year
+        current_year = datetime.now().year
+        return datetime.strptime(f"{text.strip()}, {current_year}", "%B %d, %Y")
+    except:
+        return None
+
+
+@st.cache_data(ttl=600)  # Cache for 10 minutes
+def load_counterpart_data():
+    """
+    Load Counterpart Performance data from Google Sheets.
+
+    The sheet has:
+    1. OVERALL PERFORMANCE section at top (rows 3-11) with totals
+    2. Daily sections with date headers like "January 27"
+
+    Returns:
+        dict: {
+            'fb': DataFrame (daily data),
+            'google': DataFrame (daily data),
+            'fb_overall': DataFrame (overall totals),
+            'google_overall': DataFrame (overall totals)
+        }
+    """
+    try:
+        client = get_google_client()
+        if client is None:
+            return {'fb': pd.DataFrame(), 'google': pd.DataFrame(),
+                    'fb_overall': pd.DataFrame(), 'google_overall': pd.DataFrame()}
+
+        spreadsheet = client.open_by_key(CHANNEL_ROI_SHEET_ID)
+        worksheet = spreadsheet.get_worksheet_by_id(COUNTERPART_SHEET['gid'])
+        all_data = worksheet.get_all_values()
+
+        fb_records = []
+        google_records = []
+        fb_overall_records = []
+        google_overall_records = []
+        current_date = None
+        in_overall_section = False
+
+        for row_idx, row in enumerate(all_data):
+            # Check column B (index 1) - column A is empty
+            cell_b = str(row[1]).strip() if len(row) > 1 else ''
+
+            # Detect OVERALL PERFORMANCE section
+            if 'OVERALL PERFORMANCE' in cell_b:
+                in_overall_section = True
+                continue
+
+            # Skip header rows
+            if '渠道来源' in cell_b or 'Channel Source' in cell_b:
+                continue
+
+            # Detect date header - marks end of OVERALL section
+            if is_date_header(cell_b):
+                in_overall_section = False
+                current_date = parse_date_header(cell_b)
+                continue
+
+            # Skip empty rows
+            if not cell_b:
+                continue
+
+            # Parse FB data (columns B-H, index 1-7)
+            fb_cols = COUNTERPART_FB_COLUMNS
+            if len(row) > max(fb_cols.values()):
+                channel = str(row[fb_cols['channel_source']]).strip()
+                first_recharge = parse_numeric(row[fb_cols['first_recharge']])
+                if channel and first_recharge > 0:
+                    record = {
+                        'channel': channel,
+                        'first_recharge': int(first_recharge),
+                        'total_amount': parse_numeric(row[fb_cols['total_amount']]),
+                        'arppu': parse_numeric(row[fb_cols['arppu']]),
+                        'spending': parse_numeric(row[fb_cols['spending']]),
+                        'cost_per_recharge': parse_numeric(row[fb_cols['cost_per_recharge']]),
+                        'roas': parse_numeric(row[fb_cols['roas']]),
+                    }
+                    if in_overall_section:
+                        fb_overall_records.append(record)
+                    elif current_date is not None:
+                        record['date'] = current_date
+                        fb_records.append(record)
+
+            # Parse Google data (columns J-P, index 9-15)
+            google_cols = COUNTERPART_GOOGLE_COLUMNS
+            if len(row) > max(google_cols.values()):
+                channel = str(row[google_cols['channel_source']]).strip()
+                first_recharge = parse_numeric(row[google_cols['first_recharge']])
+                if channel and first_recharge > 0:
+                    record = {
+                        'channel': channel,
+                        'first_recharge': int(first_recharge),
+                        'total_amount': parse_numeric(row[google_cols['total_amount']]),
+                        'arppu': parse_numeric(row[google_cols['arppu']]),
+                        'spending': parse_numeric(row[google_cols['spending']]),
+                        'cost_per_recharge': parse_numeric(row[google_cols['cost_per_recharge']]),
+                        'roas': parse_numeric(row[google_cols['roas']]),
+                    }
+                    if in_overall_section:
+                        google_overall_records.append(record)
+                    elif current_date is not None:
+                        record['date'] = current_date
+                        google_records.append(record)
+
+        fb_df = pd.DataFrame(fb_records) if fb_records else pd.DataFrame()
+        google_df = pd.DataFrame(google_records) if google_records else pd.DataFrame()
+        fb_overall_df = pd.DataFrame(fb_overall_records) if fb_overall_records else pd.DataFrame()
+        google_overall_df = pd.DataFrame(google_overall_records) if google_overall_records else pd.DataFrame()
+
+        print(f"[OK] Loaded {len(fb_records)} Counterpart FB daily records")
+        print(f"[OK] Loaded {len(google_records)} Counterpart Google daily records")
+        print(f"[OK] Loaded {len(fb_overall_records)} Counterpart FB overall records")
+        print(f"[OK] Loaded {len(google_overall_records)} Counterpart Google overall records")
+
+        return {
+            'fb': fb_df,
+            'google': google_df,
+            'fb_overall': fb_overall_df,
+            'google_overall': google_overall_df
+        }
+
+    except Exception as e:
+        print(f"[ERROR] Failed to load Counterpart data: {e}")
+        import traceback
+        traceback.print_exc()
+        return {'fb': pd.DataFrame(), 'google': pd.DataFrame(),
+                'fb_overall': pd.DataFrame(), 'google_overall': pd.DataFrame()}
+
+
+def refresh_counterpart_data():
+    """Clear counterpart data cache."""
+    load_counterpart_data.clear()
 
 
 # Test functions
