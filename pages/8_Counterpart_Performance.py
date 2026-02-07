@@ -300,34 +300,20 @@ def render_daily_trends(df, channel_name):
         st.plotly_chart(fig, use_container_width=True)
 
 
-def get_wed_tue_week(date):
-    """Get Wednesday-Tuesday week number and year for a given date.
-    Week starts on Wednesday (weekday=2) and ends on Tuesday (weekday=1)."""
-    # Shift date back by 2 days so Wednesday becomes the start of week
+def get_tue_mon_week(date):
+    """Get Tuesday-Monday week number and year for a given date.
+    Week starts on Tuesday (weekday=1) and ends on Monday (weekday=0)."""
     # Python weekday: Mon=0, Tue=1, Wed=2, Thu=3, Fri=4, Sat=5, Sun=6
-    adjusted_date = date - timedelta(days=(date.weekday() - 2) % 7)
+    # Shift date so Tuesday becomes day 0 of the week
+    adjusted_date = date - timedelta(days=(date.weekday() - 1) % 7)
     week_num = adjusted_date.isocalendar()[1]
     year = adjusted_date.isocalendar()[0]
     return year, week_num
 
 
-def get_week_date_range(year, week_num):
-    """Get the Wednesday start and Tuesday end dates for a Wed-Tue week."""
-    # Find the first Wednesday of the year
-    jan1 = datetime(year, 1, 1)
-    days_to_wed = (2 - jan1.weekday()) % 7  # Days until Wednesday
-    first_wed = jan1 + timedelta(days=days_to_wed)
-
-    # Calculate the Wednesday of the target week
-    week_start = first_wed + timedelta(weeks=week_num - 1)
-    week_end = week_start + timedelta(days=6)  # Tuesday
-
-    return week_start, week_end
-
-
 def render_weekly_summary(df, channel_name):
-    """Render weekly summary with pie charts comparing channel sources (Wed-Tue weeks)."""
-    st.markdown('<div class="section-header"><h3>📆 WEEKLY SUMMARY BY CHANNEL SOURCE (Wed-Tue)</h3></div>', unsafe_allow_html=True)
+    """Render weekly summary with pie charts comparing channel sources (Tue-Mon weeks)."""
+    st.markdown('<div class="section-header"><h3>📆 WEEKLY SUMMARY BY CHANNEL SOURCE (Tue-Mon)</h3></div>', unsafe_allow_html=True)
 
     if df.empty:
         st.warning("No weekly data available for charts")
@@ -342,8 +328,8 @@ def render_weekly_summary(df, channel_name):
 
     df_filtered['date'] = pd.to_datetime(df_filtered['date'])
 
-    # Calculate Wed-Tue week
-    df_filtered['week_info'] = df_filtered['date'].apply(get_wed_tue_week)
+    # Calculate Tue-Mon week
+    df_filtered['week_info'] = df_filtered['date'].apply(get_tue_mon_week)
     df_filtered['year'] = df_filtered['week_info'].apply(lambda x: x[0])
     df_filtered['week'] = df_filtered['week_info'].apply(lambda x: x[1])
     df_filtered['week_key'] = df_filtered.apply(lambda x: f"{x['year']}-W{x['week']:02d}", axis=1)
