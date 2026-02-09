@@ -1,6 +1,6 @@
 """
 BINGO365 Daily Monitoring Dashboard
-Main Streamlit Application
+Main Streamlit Application - v2.1
 """
 import streamlit as st
 
