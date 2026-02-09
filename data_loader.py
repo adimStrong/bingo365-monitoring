@@ -658,7 +658,8 @@ def load_facebook_ads_data():
             df = pd.DataFrame(all_ads_data)
             # Filter out excluded persons if configured
             if EXCLUDED_PERSONS and 'person_name' in df.columns:
-                df = df[~df['person_name'].isin(EXCLUDED_PERSONS)]
+                excluded_upper = [p.upper() for p in EXCLUDED_PERSONS]
+                df = df[~df['person_name'].str.upper().isin(excluded_upper)]
                 print(f"Excluded persons filtered: {EXCLUDED_PERSONS}")
             return df
         return pd.DataFrame()
