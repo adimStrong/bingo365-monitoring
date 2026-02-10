@@ -951,7 +951,8 @@ def load_updated_accounts_data():
             """Check if name is a sample/placeholder/header entry."""
             n = name.lower().strip()
             skip = ('sample', 'employee', 'company account', 'link owner',
-                    'updated', 'fb acc record', 'game id')
+                    'updated', 'fb acc record', 'game id', 'gmail',
+                    'juanbingo', 'account information', 'account detail')
             return any(kw in n for kw in skip)
 
         # --- Group 1: Personal FB Accounts ---
