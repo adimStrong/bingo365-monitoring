@@ -201,33 +201,19 @@ def main():
 
         st.markdown("---")
 
-        # Employee filter
-        st.subheader("👤 Employee Filter")
-        employees = set()
-        if not group1_df.empty and 'Employee' in group1_df.columns:
-            employees.update(group1_df['Employee'].unique())
-        if not group2_df.empty and 'Employee' in group2_df.columns:
-            employees.update(group2_df['Employee'].unique())
-        employees = sorted(e for e in employees if e)
+        # Group filter
+        st.subheader("📋 Group Filter")
+        group_options = [
+            "All",
+            "Group 1: Personal FB",
+            "Group 2: Company",
+            "Group 3: BM Record",
+        ]
+        selected_group = st.selectbox("Group", group_options)
 
-        selected_employee = st.selectbox("Employee", ["All"] + employees)
-
-        st.markdown("---")
-
-        # Group visibility toggles
-        st.subheader("📋 Show Groups")
-        show_g1 = st.checkbox("Personal FB Accounts", value=True)
-        show_g2 = st.checkbox("Company Accounts", value=True)
-        show_g3 = st.checkbox("BM Record", value=True)
-
-    # Apply employee filter
-    if selected_employee != "All":
-        if not group1_df.empty and 'Employee' in group1_df.columns:
-            group1_df = group1_df[group1_df['Employee'] == selected_employee]
-        if not group2_df.empty and 'Employee' in group2_df.columns:
-            group2_df = group2_df[group2_df['Employee'] == selected_employee]
-        if not group3_df.empty and 'Link Owner' in group3_df.columns:
-            group3_df = group3_df[group3_df['Link Owner'].str.upper() == selected_employee.upper()]
+    show_g1 = selected_group in ("All", "Group 1: Personal FB")
+    show_g2 = selected_group in ("All", "Group 2: Company")
+    show_g3 = selected_group in ("All", "Group 3: BM Record")
 
     # --- Render Sections ---
     render_kpi_cards(group1_df, group2_df)
