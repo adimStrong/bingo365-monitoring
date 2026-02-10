@@ -947,12 +947,16 @@ def load_updated_accounts_data():
                 return '********'
             return val
 
+        def is_sample(name):
+            """Check if name is a sample/placeholder entry."""
+            return name.lower() in ('sample', 'sample1', 'sample2')
+
         # --- Group 1: Personal FB Accounts ---
         g1 = UPDATED_ACCOUNTS_GROUP1_COLUMNS
         g1_records = []
         for row in data_rows:
             employee = safe_get(row, g1['employee'])
-            if not employee:
+            if not employee or is_sample(employee):
                 continue
             g1_records.append({
                 'Employee': employee,
@@ -973,7 +977,7 @@ def load_updated_accounts_data():
         g2_records = []
         for row in data_rows:
             employee = safe_get(row, g2['employee'])
-            if not employee:
+            if not employee or is_sample(employee):
                 continue
             g2_records.append({
                 'Employee': employee,
@@ -993,7 +997,7 @@ def load_updated_accounts_data():
         g3_records = []
         for row in data_rows:
             link_owner = safe_get(row, g3['link_owner'])
-            if not link_owner:
+            if not link_owner or is_sample(link_owner):
                 continue
             g3_records.append({
                 'Link Owner': link_owner,
