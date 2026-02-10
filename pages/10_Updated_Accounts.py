@@ -63,14 +63,14 @@ def main():
     with st.spinner("Loading data..."):
         data = load_updated_accounts_data()
 
-    groups = {
-        'personal_fb': ('Personal FB', data.get('personal_fb', pd.DataFrame())),
+    personal_fb = data.get('personal_fb', pd.DataFrame())
+    filter_groups = {
         'company': ('Company', data.get('company', pd.DataFrame())),
         'juanbingo': ('Juanbingo', data.get('juanbingo', pd.DataFrame())),
         'own_created': ('Own Created', data.get('own_created', pd.DataFrame())),
     }
 
-    if all(df.empty for _, df in groups.values()):
+    if personal_fb.empty and all(df.empty for _, df in filter_groups.values()):
         st.error("No account data available.")
         return
 
@@ -83,12 +83,16 @@ def main():
             st.rerun()
         st.markdown("---")
         st.subheader("📋 Filter")
-        options = ["All"] + [label for label, df in groups.values() if not df.empty]
+        options = ["All"] + [label for label, df in filter_groups.values() if not df.empty]
         selected = st.selectbox("Group", options)
 
-    # Filter
-    show = {k: selected in ("All", label) for k, (label, _) in groups.items()}
-    filtered = {k: df if show[k] else pd.DataFrame() for k, (_, df) in groups.items()}
+    # Filter - Personal FB always shows, filter applies to the 3 groups
+    show = {k: selected in ("All", label) for k, (label, _) in filter_groups.items()}
+    # Include personal_fb always
+    groups = {'personal_fb': ('Personal FB', personal_fb)}
+    groups.update(filter_groups)
+    filtered = {'personal_fb': personal_fb}
+    filtered.update({k: df if show[k] else pd.DataFrame() for k, (_, df) in filter_groups.items()})
 
     # KPI Cards
     st.markdown('<div class="section-header"><h3>📊 ACCOUNT OVERVIEW</h3></div>', unsafe_allow_html=True)
