@@ -8,11 +8,11 @@ import os
 # Add the project directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import requests
 from datetime import datetime, timedelta
 from data_loader import load_facebook_ads_data
 from daily_report import generate_facebook_ads_section
 from config import DAILY_REPORT_ENABLED
+from telegram_reporter import TelegramReporter
 
 def send_report():
     """Load data from INDIVIDUAL KPI sheet, generate report, and send to Telegram"""
@@ -36,22 +36,14 @@ def send_report():
     report += generate_facebook_ads_section(fb_ads_df, yesterday)
     report += '\n@xxxadsron @Adsbasty'
 
-    # Telegram config
-    bot_token = '8126268680:AAEXeyB0DSmLIhx34BOlUVkFYkfvv-PW5C8'
-    chat_id = '-1003623286914'  # KPI Ads group
-
     print("Sending to Telegram...")
-    response = requests.post(
-        f'https://api.telegram.org/bot{bot_token}/sendMessage',
-        json={'chat_id': chat_id, 'text': report, 'parse_mode': 'HTML'},
-        timeout=30
-    )
-
-    if response.json().get('ok'):
+    try:
+        reporter = TelegramReporter()
+        result = reporter.send_message(report)
         print('[OK] Report sent to KPI Ads group!')
         return True
-    else:
-        print(f"[ERROR] {response.json().get('description')}")
+    except Exception as e:
+        print(f"[ERROR] {e}")
         return False
 
 if __name__ == "__main__":

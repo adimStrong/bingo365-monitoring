@@ -202,8 +202,8 @@ FACEBOOK_ADS_NAMES_ROW = 1
 # ============================================================
 # REAL-TIME REPORT CONFIGURATION
 # ============================================================
-REALTIME_REPORT_ENABLED = False  # Disabled - Individual KPI sending stopped
-DAILY_REPORT_ENABLED = False  # Disabled - Individual KPI daily sending stopped
+REALTIME_REPORT_ENABLED = True
+DAILY_REPORT_ENABLED = True
 
 # Send times for real-time reports (7 times daily)
 REALTIME_SEND_TIMES = [
@@ -221,7 +221,10 @@ LOW_SPEND_THRESHOLD_USD = 100  # Alert if daily spend < $100
 NO_CHANGE_ALERT = True  # Alert if no change between periods
 
 # Screenshot settings
-DASHBOARD_URL = "http://localhost:8501/Report_Dashboard"
+DASHBOARD_URL = os.getenv(
+    "DASHBOARD_URL",
+    "https://bingo365-monitoring-bjruxaftqm6xq2jvfojn8r.streamlit.app/Report_Dashboard"
+)
 SCREENSHOT_DIR = "reports/screenshots"
 
 # Last report data file (for change detection)
