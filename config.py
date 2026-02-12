@@ -245,7 +245,7 @@ FACEBOOK_ADS_PERSONS = ["JASON", "RON", "SHILA", "ADRIAN", "JOMAR", "KRISSA", "M
 TELEGRAM_MENTIONS = {
     "JASON": "Adsbasty",
     "RON": "xxxadsron",
-    "DER": "GDerr_Juan365",
+    "DER": "Derr_Juan365",
     "SHILA": "cutie0717",
     "ADRIAN": "ecrwn365",
     "KRISSA": "Ads_Krissa",
