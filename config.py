@@ -510,3 +510,62 @@ INDIVIDUAL_KPI_COL_OFFSETS = {
 }
 
 INDIVIDUAL_KPI_DATA_START_ROW = 4  # 0-indexed, first daily data row
+
+# ============================================================
+# KPI MONITORING CONFIGURATION
+# ============================================================
+KPI_PHP_USD_RATE = 57.7  # PHP to USD conversion for ROAS calc
+
+# ROAS formula: =IFERROR(ARPPU / 57.7 / Cost_per_FTD, 0)
+# Auto-calculable KPI scoring rubric
+KPI_SCORING = {
+    'cpa': {
+        'name': 'CPA (Cost Per Acquisition)',
+        'weight': 0.25,
+        'krs': 'Revenue Generation',
+        'auto': True,
+        'thresholds': [(4, 9.0, 9.99), (3, 10.0, 13.0), (2, 14.0, 15.0), (1, 15.01, float('inf'))],
+        'direction': 'lower_better',
+    },
+    'roas': {
+        'name': 'ROAS',
+        'weight': 0,
+        'krs': 'Revenue Generation',
+        'auto': True,
+        'thresholds': [(4, 0.40, float('inf')), (3, 0.20, 0.39), (2, 0.10, 0.19), (1, 0, 0.099)],
+        'direction': 'higher_better',
+    },
+    'cvr': {
+        'name': 'CVR (Conversion Rate)',
+        'weight': 0.15,
+        'krs': 'Revenue Generation',
+        'auto': True,
+        'thresholds': [(4, 7.0, 100.0), (3, 4.0, 6.99), (2, 2.0, 3.99), (1, 0, 1.99)],
+        'direction': 'higher_better',
+    },
+    'ctr': {
+        'name': 'CTR',
+        'weight': 0,
+        'krs': 'Campaign Efficiency',
+        'auto': True,
+        'thresholds': [(4, 3.0, 100.0), (3, 2.0, 2.99), (2, 1.0, 1.99), (1, 0, 0.99)],
+        'direction': 'higher_better',
+    },
+}
+
+# Manual KPIs (for display on dashboard - manager scores these)
+KPI_MANUAL = {
+    'campaign_setup': {'name': 'Campaign Setup Accuracy', 'weight': 0, 'krs': 'Campaign Efficiency'},
+    'ab_testing': {'name': 'A/B Testing', 'weight': 0, 'krs': 'Campaign Efficiency'},
+    'reporting': {'name': 'Reporting Accuracy', 'weight': 0.10, 'krs': 'Data & Reporting'},
+    'data_insights': {'name': 'Data-Driven Insights', 'weight': 0, 'krs': 'Data & Reporting'},
+    'account_dev': {'name': 'Gmail/FB Account Dev', 'weight': 0.10, 'krs': 'Account Management'},
+    'profile_dev': {'name': 'Profile Development', 'weight': 0, 'krs': 'Account Management'},
+    'collaboration': {'name': 'Collaboration', 'weight': 0.10, 'krs': 'Teamwork'},
+    'communication': {'name': 'Communication', 'weight': 0, 'krs': 'Teamwork'},
+}
+
+# KPI display order
+KPI_ORDER = ['cpa', 'roas', 'cvr', 'campaign_setup', 'ctr', 'ab_testing',
+             'reporting', 'data_insights', 'account_dev', 'profile_dev',
+             'collaboration', 'communication']

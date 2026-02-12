@@ -53,6 +53,8 @@ from config import (
     INDIVIDUAL_KPI_COL_OFFSETS,
     INDIVIDUAL_KPI_DATA_START_ROW,
     EXCLUDED_PERSONS,
+    KPI_PHP_USD_RATE,
+    KPI_SCORING,
 )
 
 
@@ -1323,6 +1325,95 @@ def load_individual_kpi_data():
 def refresh_individual_kpi_data():
     """Clear INDIVIDUAL KPI data cache."""
     load_individual_kpi_data.clear()
+
+
+# ============================================================
+# KPI MONITORING FUNCTIONS
+# ============================================================
+
+def score_kpi(metric_key, value):
+    """Score a single KPI metric based on rubric thresholds.
+    Returns (score, raw_value) tuple."""
+    if value is None or pd.isna(value):
+        return (0, 0)
+
+    rubric = KPI_SCORING.get(metric_key)
+    if not rubric:
+        return (0, value)
+
+    for score, low, high in rubric['thresholds']:
+        if rubric['direction'] == 'lower_better':
+            if low <= value <= high:
+                return (score, value)
+        else:  # higher_better
+            if low <= value <= high:
+                return (score, value)
+
+    # Fallback: if value doesn't match any range, score 1
+    return (1, value)
+
+
+def calculate_kpi_scores(monthly_df, agent_name, daily_df=None):
+    """Calculate auto KPI scores for an agent from P-tab data.
+    ROAS = ARPPU / 57.7 / Cost_per_FTD (IFERROR -> 0)
+
+    Uses monthly data for CPA/CVR, calculates CTR from clicks/impressions,
+    and gets ARPPU from daily data (latest available) for ROAS.
+
+    Returns dict: {metric_key: {'score': int, 'value': float, 'name': str}}
+    """
+    scores = {}
+    agent_data = monthly_df[monthly_df['agent'] == agent_name]
+
+    if agent_data.empty:
+        for key in KPI_SCORING:
+            scores[key] = {'score': 0, 'value': 0, 'name': KPI_SCORING[key]['name']}
+        return scores
+
+    # Use the most recent month's data
+    row = agent_data.iloc[-1]
+
+    # CPA = cost / ftd
+    cost = float(row.get('cost', 0) or 0)
+    ftd = float(row.get('ftd', 0) or 0)
+    cpa = cost / ftd if ftd > 0 else 0
+    s, v = score_kpi('cpa', cpa)
+    scores['cpa'] = {'score': s, 'value': round(v, 2), 'name': KPI_SCORING['cpa']['name']}
+
+    # ROAS = ARPPU / 57.7 / Cost_per_FTD
+    # Monthly ARPPU is often empty, so get from daily data (latest row with ARPPU)
+    arppu = float(row.get('arppu', 0) or 0)
+    cpd = float(row.get('cpd', 0) or 0)
+
+    if arppu == 0 and daily_df is not None and not daily_df.empty:
+        agent_daily = daily_df[daily_df['agent'] == agent_name].copy()
+        if not agent_daily.empty:
+            agent_daily['arppu_num'] = pd.to_numeric(agent_daily['arppu'], errors='coerce').fillna(0)
+            has_arppu = agent_daily[agent_daily['arppu_num'] > 0]
+            if not has_arppu.empty:
+                arppu = has_arppu.iloc[-1]['arppu_num']
+                cpd = float(has_arppu.iloc[-1].get('cpd', 0) or 0)
+
+    try:
+        roas = arppu / KPI_PHP_USD_RATE / cpd if (cpd > 0 and arppu > 0) else 0
+    except (ZeroDivisionError, TypeError):
+        roas = 0
+    s, v = score_kpi('roas', roas)
+    scores['roas'] = {'score': s, 'value': round(v, 4), 'name': KPI_SCORING['roas']['name']}
+
+    # CVR = conv_rate (FTD/Clicks % from sheet)
+    cvr = float(row.get('conv_rate', 0) or 0)
+    s, v = score_kpi('cvr', cvr)
+    scores['cvr'] = {'score': s, 'value': round(v, 2), 'name': KPI_SCORING['cvr']['name']}
+
+    # CTR = calculate from clicks/impressions (monthly CTR formula is broken in sheet)
+    impressions = float(row.get('impressions', 0) or 0)
+    clicks = float(row.get('clicks', 0) or 0)
+    ctr = (clicks / impressions * 100) if impressions > 0 else 0
+    s, v = score_kpi('ctr', ctr)
+    scores['ctr'] = {'score': s, 'value': round(v, 2), 'name': KPI_SCORING['ctr']['name']}
+
+    return scores
 
 
 # Test functions
