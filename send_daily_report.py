@@ -17,7 +17,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 
 from channel_data_loader import load_agent_performance_data as load_ptab_data
-from daily_report import generate_facebook_ads_section, generate_monthly_overview, generate_by_campaign_section
+from daily_report import generate_by_campaign_section
 from config import (
     DAILY_REPORT_ENABLED,
     DAILY_REPORT_SEND_TIME,
@@ -93,31 +93,23 @@ def send_report():
     ptab_data = load_ptab_data()
 
     import pandas as pd
-    daily_df = ptab_data.get('daily', pd.DataFrame()) if ptab_data else pd.DataFrame()
-    monthly_df = ptab_data.get('monthly', pd.DataFrame()) if ptab_data else pd.DataFrame()
     ad_accounts_df = ptab_data.get('ad_accounts', pd.DataFrame()) if ptab_data else pd.DataFrame()
 
-    if daily_df.empty:
-        logger.error("No P-tab daily data loaded!")
+    if ad_accounts_df.empty:
+        logger.error("No P-tab ad accounts data loaded!")
         return False
 
     # T+1 reporting: yesterday's data
     yesterday = (datetime.now() - timedelta(days=1)).date()
 
     logger.info(f"Generating T+1 report for {yesterday}...")
-    report = f"📊 <b>BINGO365 T+1 Report</b> - {yesterday.strftime('%b %d, %Y')}\n"
-    report += f"<i>vs Last 7 Days Average</i>\n\n"
+    report = f"📊 <b>BINGO365 T+1 Report</b> - {yesterday.strftime('%b %d, %Y')}\n\n"
 
-    # Monthly overview
-    report += generate_monthly_overview(monthly_df)
-
-    # Daily T+1 performance
-    report += generate_facebook_ads_section(daily_df, yesterday)
-
-    # By Campaign section
-    campaign_section = ""
+    # By Campaign section only (per boss request)
     if not ad_accounts_df.empty:
-        campaign_section = generate_by_campaign_section(ad_accounts_df, yesterday)
+        report += generate_by_campaign_section(ad_accounts_df, yesterday)
+    else:
+        report += "⚠️ No campaign data available.\n"
 
     report += '\n@xxxadsron @Adsbasty'
 
@@ -125,11 +117,6 @@ def send_report():
     try:
         reporter = TelegramReporter()
         send_long_message(reporter, report)
-
-        # Send By Campaign as separate message if present
-        if campaign_section:
-            send_long_message(reporter, campaign_section)
-
         logger.info("Report sent to KPI Ads group!")
         return True
     except Exception as e:
