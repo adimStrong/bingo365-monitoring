@@ -13,6 +13,14 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import AGENTS, SMS_TYPES, FACEBOOK_ADS_PERSONS
 from data_loader import load_agent_performance_data, load_agent_content_data, get_date_range, load_facebook_ads_data
+from channel_data_loader import load_agent_performance_data as load_ptab_data, refresh_agent_performance_data
+
+# Map FACEBOOK_ADS_PERSONS (uppercase) to P-tab agent names (title case)
+PTAB_AGENT_MAP = {
+    'MIKA': 'Mika', 'ADRIAN': 'Adrian', 'JOMAR': 'Jomar',
+    'SHILA': 'Shila', 'KRISSA': 'Krissa', 'JASON': 'Jason',
+    'RON': 'Ron', 'DER': 'Derr',
+}
 
 # Sidebar logo
 logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "logo.jpg")
@@ -175,7 +183,11 @@ st.markdown(f"""
 # SECTION TABS
 # ============================================================
 
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "💰 Facebook Ads", "🎨 Creative Work", "📱 SMS"])
+tab1, tab2, tab5, tab6, tab3, tab4 = st.tabs([
+    "📊 Overview", "💰 Facebook Ads",
+    "📈 Individual Overall", "🎯 By Campaign",
+    "🎨 Creative Work", "📱 SMS",
+])
 
 # ============================================================
 # TAB 1: OVERVIEW
@@ -587,6 +599,175 @@ with tab4:
         st.dataframe(display_sms, use_container_width=True, hide_index=True)
     else:
         st.info("No SMS data available")
+
+# ============================================================
+# TAB 5: INDIVIDUAL OVERALL (P-tab data)
+# ============================================================
+
+with tab5:
+    st.subheader("📈 Individual Overall (Channel ROI)")
+
+    ptab_agent = PTAB_AGENT_MAP.get(selected_agent)
+    ptab_data = load_ptab_data()
+    ptab_daily = ptab_data.get('daily', pd.DataFrame())
+    ptab_monthly = ptab_data.get('monthly', pd.DataFrame())
+
+    if ptab_agent and not ptab_daily.empty and ptab_agent in ptab_daily['agent'].values:
+        agent_daily = ptab_daily[ptab_daily['agent'] == ptab_agent].copy()
+        agent_monthly = ptab_monthly[ptab_monthly['agent'] == ptab_agent] if not ptab_monthly.empty else pd.DataFrame()
+
+        # KPI cards - totals for this agent
+        total_cost = agent_daily['cost'].sum()
+        total_reg = int(agent_daily['register'].sum())
+        total_ftd = int(agent_daily['ftd'].sum())
+        avg_cpr = total_cost / total_reg if total_reg > 0 else 0
+        avg_cpd = total_cost / total_ftd if total_ftd > 0 else 0
+        conv_rate = (total_ftd / total_reg * 100) if total_reg > 0 else 0
+
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
+        col1.metric("Cost", f"${total_cost:,.2f}")
+        col2.metric("Register", f"{total_reg:,}")
+        col3.metric("FTD", f"{total_ftd:,}")
+        col4.metric("CPR", f"${avg_cpr:.2f}")
+        col5.metric("Cost/FTD", f"${avg_cpd:.2f}")
+        col6.metric("Conv Rate", f"{conv_rate:.1f}%")
+
+        st.divider()
+
+        # Monthly summary (if available)
+        if not agent_monthly.empty:
+            st.subheader("Monthly Summary")
+            m_display = agent_monthly[['month', 'cost', 'register', 'cpr', 'ftd', 'cpd', 'conv_rate', 'impressions', 'clicks', 'ctr', 'roas']].copy()
+            st.dataframe(
+                m_display, use_container_width=True, hide_index=True,
+                column_config={
+                    "cost": st.column_config.NumberColumn("Cost", format="$%.2f"),
+                    "cpr": st.column_config.NumberColumn("CPR", format="$%.2f"),
+                    "cpd": st.column_config.NumberColumn("CPD", format="$%.2f"),
+                    "conv_rate": st.column_config.NumberColumn("Conv %", format="%.2f%%"),
+                    "ctr": st.column_config.NumberColumn("CTR", format="%.2f%%"),
+                    "roas": st.column_config.NumberColumn("ROAS", format="%.2f%%"),
+                },
+            )
+            st.divider()
+
+        # Daily trend charts
+        col1, col2 = st.columns(2)
+        with col1:
+            fig = go.Figure()
+            fig.add_trace(go.Bar(x=agent_daily['date'], y=agent_daily['cost'], name='Cost', marker_color='#667eea'))
+            fig.update_layout(height=300, title='Daily Cost', xaxis_tickformat='%m/%d', margin=dict(l=20, r=20, t=40, b=20))
+            st.plotly_chart(fig, use_container_width=True)
+        with col2:
+            fig = go.Figure()
+            fig.add_trace(go.Bar(x=agent_daily['date'], y=agent_daily['register'], name='Register', marker_color='#3498db'))
+            fig.add_trace(go.Bar(x=agent_daily['date'], y=agent_daily['ftd'], name='FTD', marker_color='#27ae60'))
+            fig.update_layout(height=300, title='Register vs FTD', xaxis_tickformat='%m/%d', barmode='group', margin=dict(l=20, r=20, t=40, b=20))
+            st.plotly_chart(fig, use_container_width=True)
+
+        # Daily data table (report format)
+        st.subheader("Daily Data")
+        d_display = agent_daily[['date', 'cost', 'register', 'cpr', 'ftd', 'cpd', 'conv_rate', 'impressions', 'clicks', 'ctr', 'arppu', 'roas']].copy()
+        d_display['date'] = d_display['date'].dt.strftime('%m/%d/%Y')
+        st.dataframe(
+            d_display.sort_values('date', ascending=False),
+            use_container_width=True, hide_index=True,
+            column_config={
+                "cost": st.column_config.NumberColumn("Cost", format="$%.2f"),
+                "cpr": st.column_config.NumberColumn("CPR", format="$%.2f"),
+                "cpd": st.column_config.NumberColumn("CPD", format="$%.2f"),
+                "conv_rate": st.column_config.NumberColumn("Conv %", format="%.2f%%"),
+                "ctr": st.column_config.NumberColumn("CTR", format="%.2f%%"),
+                "arppu": st.column_config.NumberColumn("ARPPU", format="$%.2f"),
+                "roas": st.column_config.NumberColumn("ROAS", format="%.2f%%"),
+            },
+        )
+    elif ptab_agent:
+        st.info(f"No Channel ROI data available for {selected_agent} ({ptab_agent}).")
+    else:
+        st.info(f"{selected_agent} does not have a P-tab in Channel ROI.")
+
+# ============================================================
+# TAB 6: BY CAMPAIGN (Ad Account breakdown from P-tabs)
+# ============================================================
+
+with tab6:
+    st.subheader("🎯 By Campaign (Ad Accounts)")
+
+    ptab_agent_c = PTAB_AGENT_MAP.get(selected_agent)
+    ptab_data_c = load_ptab_data()
+    ptab_ad = ptab_data_c.get('ad_accounts', pd.DataFrame())
+
+    if ptab_agent_c and not ptab_ad.empty and ptab_agent_c in ptab_ad['agent'].values:
+        agent_ad = ptab_ad[ptab_ad['agent'] == ptab_agent_c].copy()
+
+        # Aggregate by ad account
+        acct_summary = agent_ad.groupby('ad_account').agg({
+            'cost': 'sum', 'impressions': 'sum', 'clicks': 'sum',
+        }).reset_index()
+        acct_summary['ctr'] = acct_summary.apply(
+            lambda x: (x['clicks'] / x['impressions'] * 100) if x['impressions'] > 0 else 0, axis=1)
+        acct_summary = acct_summary.sort_values('cost', ascending=False)
+
+        # KPI - total across all ad accounts
+        total_cost = acct_summary['cost'].sum()
+        total_impr = int(acct_summary['impressions'].sum())
+        total_clicks = int(acct_summary['clicks'].sum())
+        avg_ctr = (total_clicks / total_impr * 100) if total_impr > 0 else 0
+
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Total Cost", f"${total_cost:,.2f}")
+        col2.metric("Impressions", f"{total_impr:,}")
+        col3.metric("Clicks", f"{total_clicks:,}")
+        col4.metric("CTR", f"{avg_ctr:.2f}%")
+
+        st.divider()
+
+        # Cost by ad account - horizontal bar
+        fig = px.bar(
+            acct_summary.sort_values('cost', ascending=True),
+            y='ad_account', x='cost', orientation='h',
+            title='Cost by Ad Account',
+            text_auto='$.2s',
+            color_discrete_sequence=['#667eea'],
+        )
+        fig.update_layout(height=max(300, len(acct_summary) * 45), showlegend=False, yaxis_title='')
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Ad account summary table
+        st.subheader("Ad Account Summary")
+        acct_display = acct_summary.rename(columns={
+            'ad_account': 'Ad Account', 'cost': 'Cost',
+            'impressions': 'Impressions', 'clicks': 'Clicks', 'ctr': 'CTR',
+        })
+        st.dataframe(
+            acct_display, use_container_width=True, hide_index=True,
+            column_config={
+                "Cost": st.column_config.NumberColumn(format="$%.2f"),
+                "Impressions": st.column_config.NumberColumn(format="%d"),
+                "Clicks": st.column_config.NumberColumn(format="%d"),
+                "CTR": st.column_config.NumberColumn(format="%.2f%%"),
+            },
+        )
+
+        # Per-account daily detail
+        st.subheader("Daily Breakdown by Ad Account")
+        acct_daily = agent_ad.copy()
+        acct_daily['date'] = acct_daily['date'].dt.strftime('%m/%d/%Y')
+        st.dataframe(
+            acct_daily[['date', 'ad_account', 'cost', 'impressions', 'clicks', 'ctr']].sort_values(['date', 'ad_account'], ascending=[False, True]),
+            use_container_width=True, hide_index=True,
+            column_config={
+                "cost": st.column_config.NumberColumn("Cost", format="$%.2f"),
+                "impressions": st.column_config.NumberColumn("Impressions", format="%d"),
+                "clicks": st.column_config.NumberColumn("Clicks", format="%d"),
+                "ctr": st.column_config.NumberColumn("CTR", format="%.2f%%"),
+            },
+        )
+    elif ptab_agent_c:
+        st.info(f"No ad account data available for {selected_agent} ({ptab_agent_c}).")
+    else:
+        st.info(f"{selected_agent} does not have a P-tab in Channel ROI.")
 
 # ============================================================
 # DOWNLOAD SECTION

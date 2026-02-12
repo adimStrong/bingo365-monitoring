@@ -468,21 +468,21 @@ AGENT_PERFORMANCE_TABS = [
     {"name": "P13-Shila", "gid": 874276337, "agent": "Shila"},
 ]
 
-# Overall daily columns (1-indexed within the row)
+# Overall/monthly columns (0-indexed, col A is empty so data starts at index 1)
 AGENT_PERF_OVERALL_COLUMNS = {
-    'channel': 0, 'date': 1, 'cost': 2, 'register': 3, 'cpr': 4,
-    'ftd': 5, 'cpd': 6, 'conv_rate': 7, 'impressions': 8,
-    'clicks': 9, 'ctr': 10, 'arppu': 11, 'roas': 12,
+    'channel': 1, 'date': 2, 'cost': 3, 'register': 4, 'cpr': 5,
+    'ftd': 6, 'cpd': 7, 'conv_rate': 8, 'impressions': 9,
+    'clicks': 10, 'ctr': 11, 'arppu': 12, 'roas': 13,
 }
 
-# Monthly summary section
-AGENT_PERF_MONTHLY_HEADERS_ROW = 2   # 0-indexed row with monthly headers
-AGENT_PERF_MONTHLY_DATA_START = 3    # 0-indexed row where monthly data starts
-AGENT_PERF_MONTHLY_DATA_END = 7      # 0-indexed row (exclusive) for monthly data
+# Monthly summary section (0-indexed rows)
+AGENT_PERF_MONTHLY_HEADERS_ROW = 2   # Row with monthly column headers
+AGENT_PERF_MONTHLY_DATA_START = 3    # First monthly data row (Feb)
+AGENT_PERF_MONTHLY_DATA_END = 7      # Exclusive end (rows 3,4,5,6)
 
-# Daily section
-AGENT_PERF_DAILY_LABEL_ROW = 7       # 0-indexed: row 8 has ad account names
-AGENT_PERF_DAILY_HEADERS_ROW = 8     # 0-indexed: row 9 has column headers
-AGENT_PERF_DAILY_DATA_START = 9      # 0-indexed: row 10 is first data row
-AGENT_PERF_AD_ACCOUNT_START_COL = 14 # 0-indexed: col 15 (column O)
+# Daily section (0-indexed rows)
+AGENT_PERF_DAILY_LABEL_ROW = 8       # Row with "Overall" label + ad account names
+AGENT_PERF_DAILY_HEADERS_ROW = 9     # Row with column headers
+AGENT_PERF_DAILY_DATA_START = 10     # First daily data row
+AGENT_PERF_AD_ACCOUNT_START_COL = 15 # First ad account column (0-indexed)
 AGENT_PERF_AD_ACCOUNT_STRIDE = 5    # Every 5 columns per ad account
