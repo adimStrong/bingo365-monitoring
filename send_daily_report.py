@@ -16,7 +16,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 
-from channel_data_loader import load_individual_kpi_data, load_agent_performance_data as load_ptab_data
+from channel_data_loader import load_agent_performance_data as load_ptab_data
 from daily_report import generate_facebook_ads_section, generate_monthly_overview, generate_by_campaign_section
 from config import (
     DAILY_REPORT_ENABLED,
@@ -61,19 +61,21 @@ def send_reminder(minutes_before, label):
 
 
 def send_report():
-    """Load data from INDIVIDUAL KPI sheet + P-tabs, generate report, and send to Telegram."""
+    """Load P-tab data, generate report, and send to Telegram."""
     if not DAILY_REPORT_ENABLED:
         logger.warning("Daily report sending is disabled in config.py")
         return False
 
-    logger.info("Loading INDIVIDUAL KPI data...")
-    kpi_df = load_individual_kpi_data()
-
-    logger.info("Loading P-tab data for By Campaign...")
+    logger.info("Loading P-tab data...")
     ptab_data = load_ptab_data()
 
-    if (kpi_df is None or kpi_df.empty):
-        logger.error("No INDIVIDUAL KPI data loaded!")
+    import pandas as pd
+    daily_df = ptab_data.get('daily', pd.DataFrame()) if ptab_data else pd.DataFrame()
+    monthly_df = ptab_data.get('monthly', pd.DataFrame()) if ptab_data else pd.DataFrame()
+    ad_accounts_df = ptab_data.get('ad_accounts', pd.DataFrame()) if ptab_data else pd.DataFrame()
+
+    if daily_df.empty:
+        logger.error("No P-tab daily data loaded!")
         return False
 
     # T+1 reporting: yesterday's data
@@ -84,14 +86,12 @@ def send_report():
     report += f"<i>vs Last 7 Days Average</i>\n\n"
 
     # Monthly overview
-    report += generate_monthly_overview(kpi_df)
+    report += generate_monthly_overview(monthly_df)
 
     # Daily T+1 performance
-    report += generate_facebook_ads_section(kpi_df, yesterday)
+    report += generate_facebook_ads_section(daily_df, yesterday)
 
     # By Campaign section
-    import pandas as pd
-    ad_accounts_df = ptab_data.get('ad_accounts', pd.DataFrame()) if ptab_data else pd.DataFrame()
     if not ad_accounts_df.empty:
         report += generate_by_campaign_section(ad_accounts_df, yesterday)
 
