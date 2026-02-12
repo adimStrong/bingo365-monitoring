@@ -569,3 +569,26 @@ KPI_MANUAL = {
 KPI_ORDER = ['cpa', 'roas', 'cvr', 'campaign_setup', 'ctr', 'ab_testing',
              'reporting', 'data_insights', 'account_dev', 'profile_dev',
              'collaboration', 'communication']
+
+# ============================================================
+# TELEGRAM CHAT LISTENER CONFIGURATION
+# ============================================================
+CHAT_LISTENER_BOT_TOKEN = "7925543136:AAHv-sp5wO5bavC67ICL-I0fcCEpu7QuxAY"
+CHAT_LISTENER_CHAT_ID = "-4648816254"
+CHAT_LISTENER_DB = "chat_messages.db"
+CHAT_LISTENER_POLL_INTERVAL = 5  # seconds between getUpdates calls
+
+# Reporting Accuracy scoring rubric (minutes after each hour mark)
+REPORTING_ACCURACY_SCORING = [
+    (4, 0, 14),      # Score 4: < 15 minutes
+    (3, 15, 24),     # Score 3: 15-24 minutes
+    (2, 25, 34),     # Score 2: 25-34 minutes
+    (1, 35, 999),    # Score 1: 35+ minutes
+]
+
+# Keywords that indicate a report message (case-insensitive)
+REPORT_KEYWORDS = [
+    "cost per ftd", "cost/ftd", "cpa", "roas", "cpr",
+    "report", "daily report", "update", "summary",
+    "register", "ftd", "spend", "cost",
+]

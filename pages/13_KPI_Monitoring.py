@@ -18,6 +18,7 @@ from config import (
     KPI_ORDER,
     KPI_PHP_USD_RATE,
 )
+from chat_listener import get_agent_reporting_scores
 
 st.set_page_config(page_title="KPI Monitoring", page_icon="📊", layout="wide")
 st.title("📊 KPI Monitoring")
@@ -25,6 +26,16 @@ st.title("📊 KPI Monitoring")
 # Initialize session state for manual scores
 if 'manual_scores' not in st.session_state:
     st.session_state.manual_scores = {}
+
+# Auto-fill reporting scores from Telegram chat data
+try:
+    chat_reporting = get_agent_reporting_scores()
+    for agent_name, data in chat_reporting.items():
+        key = f"{agent_name}_reporting"
+        if key not in st.session_state.manual_scores or st.session_state.manual_scores[key] == 0:
+            st.session_state.manual_scores[key] = data['score']
+except Exception:
+    chat_reporting = {}
 
 ALL_KPIS = {**KPI_SCORING, **KPI_MANUAL}
 MANUAL_KEYS = list(KPI_MANUAL.keys())
@@ -36,7 +47,7 @@ PARAM_TEXT = {
     'campaign_setup': '4: 95-97% | 3: 90-94% | 2: 85-89% | 1: <85%',
     'ctr': '4: 3-4% | 3: 2-2.9% | 2: 1-1.9% | 1: <0.9%',
     'ab_testing': '4: 20-24/wk | 3: 11-19/wk | 2: 6-10/wk | 1: <6/wk',
-    'reporting': '4: 95-100% | 3: 85-94% | 2: 75-84% | 1: <75%',
+    'reporting': '4: <15min | 3: 15-24min | 2: 25-34min | 1: 35+min (auto from TG chat)',
     'data_insights': '4: Excellent | 3: Good | 2: Fair | 1: Poor',
     'account_dev': '4: 95-100% | 3: 85-94% | 2: 75-84% | 1: <75%',
     'profile_dev': '4: Excellent | 3: Good | 2: Fair | 1: Poor',
