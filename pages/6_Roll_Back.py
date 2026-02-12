@@ -199,6 +199,7 @@ def main():
         combined = pd.concat(chart_data, ignore_index=True)
         combined['cpr'] = combined.apply(lambda x: x['cost'] / x['register'] if x['register'] > 0 else 0, axis=1)
         combined['cost_ftd'] = combined.apply(lambda x: x['cost'] / x['ftd'] if x['ftd'] > 0 else 0, axis=1)
+        combined['conv_rate'] = combined.apply(lambda x: x['ftd'] / x['register'] * 100 if x['register'] > 0 else 0, axis=1)
 
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -219,7 +220,7 @@ def main():
             fig.update_layout(height=300)
             st.plotly_chart(fig, use_container_width=True)
 
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             fig = px.line(combined, x='date', y='cpr', color='channel', markers=True, title='Daily CPR',
                          color_discrete_map={'Facebook': '#1877f2', 'Google': '#fbbc05'})
@@ -228,6 +229,12 @@ def main():
 
         with col2:
             fig = px.line(combined, x='date', y='cost_ftd', color='channel', markers=True, title='Daily Cost/FTD',
+                         color_discrete_map={'Facebook': '#1877f2', 'Google': '#fbbc05'})
+            fig.update_layout(height=300)
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col3:
+            fig = px.line(combined, x='date', y='conv_rate', color='channel', markers=True, title='Daily Conversion Rate (FTD/Register)',
                          color_discrete_map={'Facebook': '#1877f2', 'Google': '#fbbc05'})
             fig.update_layout(height=300)
             st.plotly_chart(fig, use_container_width=True)
@@ -260,6 +267,7 @@ def main():
         weekly_combined = pd.concat(weekly_data, ignore_index=True).sort_values('week_label')
         weekly_combined['cpr'] = weekly_combined.apply(lambda x: x['cost'] / x['register'] if x['register'] > 0 else 0, axis=1)
         weekly_combined['cost_ftd'] = weekly_combined.apply(lambda x: x['cost'] / x['ftd'] if x['ftd'] > 0 else 0, axis=1)
+        weekly_combined['conv_rate'] = weekly_combined.apply(lambda x: x['ftd'] / x['register'] * 100 if x['register'] > 0 else 0, axis=1)
 
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -280,7 +288,7 @@ def main():
             fig.update_layout(height=300)
             st.plotly_chart(fig, use_container_width=True)
 
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             fig = px.bar(weekly_combined, x='week_label', y='cpr', color='channel', barmode='group', title='Weekly CPR',
                         color_discrete_map={'Facebook': '#1877f2', 'Google': '#fbbc05'})
@@ -289,6 +297,12 @@ def main():
 
         with col2:
             fig = px.bar(weekly_combined, x='week_label', y='cost_ftd', color='channel', barmode='group', title='Weekly Cost/FTD',
+                        color_discrete_map={'Facebook': '#1877f2', 'Google': '#fbbc05'})
+            fig.update_layout(height=300)
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col3:
+            fig = px.bar(weekly_combined, x='week_label', y='conv_rate', color='channel', barmode='group', title='Weekly Conversion Rate',
                         color_discrete_map={'Facebook': '#1877f2', 'Google': '#fbbc05'})
             fig.update_layout(height=300)
             st.plotly_chart(fig, use_container_width=True)
@@ -317,6 +331,7 @@ def main():
         monthly_combined = pd.concat(monthly_data, ignore_index=True).sort_values('month')
         monthly_combined['cpr'] = monthly_combined.apply(lambda x: x['cost'] / x['register'] if x['register'] > 0 else 0, axis=1)
         monthly_combined['cost_ftd'] = monthly_combined.apply(lambda x: x['cost'] / x['ftd'] if x['ftd'] > 0 else 0, axis=1)
+        monthly_combined['conv_rate'] = monthly_combined.apply(lambda x: x['ftd'] / x['register'] * 100 if x['register'] > 0 else 0, axis=1)
 
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -337,7 +352,7 @@ def main():
             fig.update_layout(height=300)
             st.plotly_chart(fig, use_container_width=True)
 
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             fig = px.bar(monthly_combined, x='month', y='cpr', color='channel', barmode='group', title='Monthly CPR',
                         color_discrete_map={'Facebook': '#1877f2', 'Google': '#fbbc05'})
@@ -346,6 +361,12 @@ def main():
 
         with col2:
             fig = px.bar(monthly_combined, x='month', y='cost_ftd', color='channel', barmode='group', title='Monthly Cost/FTD',
+                        color_discrete_map={'Facebook': '#1877f2', 'Google': '#fbbc05'})
+            fig.update_layout(height=300)
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col3:
+            fig = px.bar(monthly_combined, x='month', y='conv_rate', color='channel', barmode='group', title='Monthly Conversion Rate',
                         color_discrete_map={'Facebook': '#1877f2', 'Google': '#fbbc05'})
             fig.update_layout(height=300)
             st.plotly_chart(fig, use_container_width=True)
@@ -360,9 +381,10 @@ def main():
     with tab1:
         if show_fb:
             display_df = fb_df[['date', 'register', 'ftd', 'ftd_recharge', 'cost', 'cpr', 'roas']].copy()
+            display_df['conv_rate'] = display_df.apply(lambda x: round(x['ftd'] / x['register'] * 100, 2) if x['register'] > 0 else 0, axis=1)
             display_df['date'] = display_df['date'].dt.strftime('%Y-%m-%d')
             display_df = display_df.sort_values('date', ascending=False)
-            display_df.columns = ['Date', 'Register', 'FTD', 'Recharge (PHP)', 'Cost (USD)', 'CPR', 'ROAS']
+            display_df.columns = ['Date', 'Register', 'FTD', 'Recharge (PHP)', 'Cost (USD)', 'CPR', 'ROAS', 'Conv Rate %']
             st.dataframe(display_df, use_container_width=True, hide_index=True)
             st.download_button("📥 Download FB CSV", display_df.to_csv(index=False), f"fb_roll_back_{datetime.now():%Y%m%d}.csv")
         else:
@@ -371,9 +393,10 @@ def main():
     with tab2:
         if show_google:
             display_df = google_df[['date', 'register', 'ftd', 'ftd_recharge', 'cost', 'cpr', 'roas']].copy()
+            display_df['conv_rate'] = display_df.apply(lambda x: round(x['ftd'] / x['register'] * 100, 2) if x['register'] > 0 else 0, axis=1)
             display_df['date'] = display_df['date'].dt.strftime('%Y-%m-%d')
             display_df = display_df.sort_values('date', ascending=False)
-            display_df.columns = ['Date', 'Register', 'FTD', 'Recharge (PHP)', 'Cost (USD)', 'CPR', 'ROAS']
+            display_df.columns = ['Date', 'Register', 'FTD', 'Recharge (PHP)', 'Cost (USD)', 'CPR', 'ROAS', 'Conv Rate %']
             st.dataframe(display_df, use_container_width=True, hide_index=True)
             st.download_button("📥 Download Google CSV", display_df.to_csv(index=False), f"google_roll_back_{datetime.now():%Y%m%d}.csv")
         else:
