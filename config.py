@@ -574,7 +574,7 @@ KPI_ORDER = ['cpa', 'roas', 'cvr', 'campaign_setup', 'ctr', 'ab_testing',
 # TELEGRAM CHAT LISTENER CONFIGURATION
 # ============================================================
 CHAT_LISTENER_BOT_TOKEN = "7925543136:AAHv-sp5wO5bavC67ICL-I0fcCEpu7QuxAY"
-CHAT_LISTENER_CHAT_ID = "-4648816254"
+CHAT_LISTENER_CHAT_ID = "-1003708530748"  # migrated from -4648816254 to supergroup
 CHAT_LISTENER_DB = "chat_messages.db"
 CHAT_LISTENER_POLL_INTERVAL = 5  # seconds between getUpdates calls
 
