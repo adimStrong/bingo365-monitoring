@@ -1401,8 +1401,9 @@ def calculate_kpi_scores(monthly_df, agent_name, daily_df=None):
     s, v = score_kpi('roas', roas)
     scores['roas'] = {'score': s, 'value': round(v, 4), 'name': KPI_SCORING['roas']['name']}
 
-    # CVR = conv_rate (FTD/Clicks % from sheet)
-    cvr = float(row.get('conv_rate', 0) or 0)
+    # CVR = FTD / Register * 100
+    register = float(row.get('register', 0) or 0)
+    cvr = (ftd / register * 100) if register > 0 else 0
     s, v = score_kpi('cvr', cvr)
     scores['cvr'] = {'score': s, 'value': round(v, 2), 'name': KPI_SCORING['cvr']['name']}
 
