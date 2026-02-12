@@ -60,6 +60,29 @@ def send_reminder(minutes_before, label):
         return False
 
 
+def send_long_message(reporter, text, max_len=4000):
+    """Split and send a long message in chunks, breaking at newlines."""
+    if len(text) <= max_len:
+        reporter.send_message(text)
+        return
+
+    parts = []
+    current = ""
+    for line in text.split('\n'):
+        # +1 for the newline character
+        if len(current) + len(line) + 1 > max_len:
+            parts.append(current)
+            current = line
+        else:
+            current = current + '\n' + line if current else line
+    if current:
+        parts.append(current)
+
+    for i, part in enumerate(parts):
+        reporter.send_message(part)
+        logger.info(f"Sent message part {i+1}/{len(parts)} ({len(part)} chars)")
+
+
 def send_report():
     """Load P-tab data, generate report, and send to Telegram."""
     if not DAILY_REPORT_ENABLED:
@@ -92,15 +115,21 @@ def send_report():
     report += generate_facebook_ads_section(daily_df, yesterday)
 
     # By Campaign section
+    campaign_section = ""
     if not ad_accounts_df.empty:
-        report += generate_by_campaign_section(ad_accounts_df, yesterday)
+        campaign_section = generate_by_campaign_section(ad_accounts_df, yesterday)
 
     report += '\n@xxxadsron @Adsbasty'
 
     logger.info("Sending to Telegram...")
     try:
         reporter = TelegramReporter()
-        reporter.send_message(report)
+        send_long_message(reporter, report)
+
+        # Send By Campaign as separate message if present
+        if campaign_section:
+            send_long_message(reporter, campaign_section)
+
         logger.info("Report sent to KPI Ads group!")
         return True
     except Exception as e:
