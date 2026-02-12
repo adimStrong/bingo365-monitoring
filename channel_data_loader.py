@@ -1210,6 +1210,14 @@ def load_individual_kpi_data():
         offsets = INDIVIDUAL_KPI_COL_OFFSETS
         records = []
 
+        # Parse ad account names from row 2 (stored for later use)
+        acct_row = all_data[2] if len(all_data) > 2 else []
+        agent_accounts = {}
+        for start_col, agent_name in INDIVIDUAL_KPI_AGENTS.items():
+            acct_text = str(acct_row[start_col]).strip() if start_col < len(acct_row) else ''
+            if acct_text:
+                agent_accounts[agent_name] = acct_text.replace('\n', ' | ')
+
         for row_idx in range(INDIVIDUAL_KPI_DATA_START_ROW, len(all_data)):
             row = all_data[row_idx]
 
@@ -1246,6 +1254,7 @@ def load_individual_kpi_data():
                 records.append({
                     'date': date_val,
                     'person_name': agent_name,
+                    'account_name': agent_accounts.get(agent_name, ''),
                     'spend': spend,
                     'spend_php': spend_php,
                     'ftd': ftd,
