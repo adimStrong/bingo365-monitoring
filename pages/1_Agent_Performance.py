@@ -1,6 +1,6 @@
 """
 Agent Performance Page - Individual agent detailed view
-Tabs: Overview, Individual Overall (P-tabs), By Campaign (P-tabs), Creative Work, SMS
+Tabs: Overview, Individual Overall (INDIVIDUAL KPI), By Campaign (P-tabs), Creative Work, SMS
 """
 import streamlit as st
 import pandas as pd
@@ -13,9 +13,12 @@ import os
 import traceback
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import AGENTS, SMS_TYPES, FACEBOOK_ADS_PERSONS
-from data_loader import load_agent_performance_data, load_agent_content_data, get_date_range, load_facebook_ads_data
-from channel_data_loader import load_agent_performance_data as load_ptab_data, refresh_agent_performance_data
+from config import AGENTS, SMS_TYPES, FACEBOOK_ADS_PERSONS, EXCLUDED_PERSONS
+from data_loader import load_agent_performance_data, load_agent_content_data, get_date_range
+from channel_data_loader import (
+    load_agent_performance_data as load_ptab_data, refresh_agent_performance_data,
+    load_individual_kpi_data, refresh_individual_kpi_data,
+)
 
 # Map FACEBOOK_ADS_PERSONS (uppercase) to P-tab agent names (title case)
 PTAB_AGENT_MAP = {
@@ -40,10 +43,9 @@ def get_agent_data(agent_name, sheet_name):
     """Load data for selected agent from Google Sheets"""
     return load_agent_performance_data(agent_name, sheet_name)
 
-# Load P-tab data early (shared across tabs)
+# Load P-tab data early (shared across By Campaign tab)
 try:
     ptab_all = load_ptab_data()
-    # Show any per-tab errors from the loader
     ptab_errors = ptab_all.get('errors', [])
     if ptab_errors:
         for err in ptab_errors:
@@ -52,11 +54,21 @@ except Exception as e:
     st.sidebar.error(f"P-tab load error: {e}")
     ptab_all = {'monthly': pd.DataFrame(), 'daily': pd.DataFrame(), 'ad_accounts': pd.DataFrame(), 'errors': [str(e)]}
 
+# Load INDIVIDUAL KPI data (with DER redistribution) for Individual Overall tab
+try:
+    kpi_df = load_individual_kpi_data()
+    if kpi_df is None:
+        kpi_df = pd.DataFrame()
+except Exception as e:
+    st.sidebar.error(f"Individual KPI load error: {e}")
+    kpi_df = pd.DataFrame()
+
 # Sidebar filters
 st.sidebar.header("Filters")
 
-if st.sidebar.button("🔄 Refresh P-tab Data", use_container_width=True):
+if st.sidebar.button("🔄 Refresh Data", use_container_width=True):
     refresh_agent_performance_data()
+    refresh_individual_kpi_data()
     st.cache_data.clear()
     st.rerun()
 
@@ -88,7 +100,7 @@ if use_real_data and agent_config:
     if running_ads_df is None or running_ads_df.empty:
         use_real_data = False
 
-# P-tab data for this agent
+# P-tab data for this agent (By Campaign tab)
 ptab_agent = PTAB_AGENT_MAP.get(selected_agent)
 ptab_daily = ptab_all.get('daily', pd.DataFrame())
 ptab_monthly = ptab_all.get('monthly', pd.DataFrame())
@@ -96,8 +108,19 @@ ptab_ad = ptab_all.get('ad_accounts', pd.DataFrame())
 
 has_ptab = ptab_agent and not ptab_daily.empty and ptab_agent in ptab_daily['agent'].values
 
-# Date range from P-tab data or legacy
-if has_ptab:
+# INDIVIDUAL KPI data for this agent (Individual Overall tab)
+# DER is excluded/redistributed - check if agent has data
+is_excluded = selected_agent.upper() in [p.upper() for p in EXCLUDED_PERSONS]
+agent_kpi_df = pd.DataFrame()
+if not kpi_df.empty and not is_excluded:
+    agent_kpi_df = kpi_df[kpi_df['person_name'] == selected_agent].copy()
+has_kpi = not agent_kpi_df.empty
+
+# Date range from INDIVIDUAL KPI, P-tab, or legacy
+if has_kpi:
+    min_date = agent_kpi_df['date'].min().date()
+    max_date = agent_kpi_df['date'].max().date()
+elif has_ptab:
     agent_ptab_daily = ptab_daily[ptab_daily['agent'] == ptab_agent]
     min_date = agent_ptab_daily['date'].min().date()
     max_date = agent_ptab_daily['date'].max().date()
@@ -123,13 +146,14 @@ else:
     with col2:
         end_date = st.date_input("To", datetime.now())
 
-# P-tab sidebar info
+# Sidebar data info
+if has_kpi:
+    st.sidebar.success(f"KPI: {len(agent_kpi_df)} days loaded")
+elif is_excluded:
+    st.sidebar.info(f"{selected_agent}'s data redistributed to other agents")
 if has_ptab:
-    n_daily = len(ptab_daily[ptab_daily['agent'] == ptab_agent])
     n_accts = ptab_ad[ptab_ad['agent'] == ptab_agent]['ad_account'].nunique() if not ptab_ad.empty and ptab_agent in ptab_ad['agent'].values else 0
-    st.sidebar.success(f"P-tab: {n_daily} days, {n_accts} ad accounts")
-elif ptab_daily.empty:
-    st.sidebar.warning(f"P-tab: no data loaded ({len(ptab_all.get('daily', []))} rows)")
+    st.sidebar.success(f"P-tab: {n_accts} ad accounts")
 
 # Fallback sample data for creative/SMS
 if not use_real_data or running_ads_df is None or running_ads_df.empty:
@@ -206,16 +230,15 @@ with tab1:
     with col1:
         st.markdown("""
         <div style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); padding: 1.5rem; border-radius: 12px; color: white;">
-            <h4 style="margin: 0; opacity: 0.9;">CHANNEL ROI</h4>
+            <h4 style="margin: 0; opacity: 0.9;">INDIVIDUAL KPI</h4>
         </div>
         """, unsafe_allow_html=True)
-        if has_ptab:
-            a_daily = ptab_daily[ptab_daily['agent'] == ptab_agent]
-            st.metric("Total Cost", f"${a_daily['cost'].sum():,.2f}")
-            st.metric("Register", f"{int(a_daily['register'].sum()):,}")
-            st.metric("FTD", f"{int(a_daily['ftd'].sum()):,}")
+        if has_kpi:
+            st.metric("Total Spend", f"${agent_kpi_df['spend'].sum():,.2f}")
+            st.metric("Register", f"{int(agent_kpi_df['register'].sum()):,}")
+            st.metric("FTD", f"{int(agent_kpi_df['result_ftd'].sum()):,}")
         else:
-            st.metric("Total Cost", "$0")
+            st.metric("Total Spend", "$0")
             st.metric("Register", "0")
             st.metric("FTD", "0")
 
@@ -252,13 +275,13 @@ with tab1:
     st.subheader("📈 Daily Activity Trend")
 
     fig = go.Figure()
-    if has_ptab:
-        a_daily = ptab_daily[ptab_daily['agent'] == ptab_agent].sort_values('date')
-        fig.add_trace(go.Scatter(x=a_daily['date'], y=a_daily['cost'], name='Cost ($)', line=dict(color='#3498db', width=3), mode='lines+markers'))
-        fig.add_trace(go.Scatter(x=a_daily['date'], y=a_daily['ftd'], name='FTD', line=dict(color='#27ae60', width=3), mode='lines+markers', yaxis='y2'))
+    if has_kpi:
+        a_daily = agent_kpi_df.sort_values('date')
+        fig.add_trace(go.Scatter(x=a_daily['date'], y=a_daily['spend'], name='Spend ($)', line=dict(color='#3498db', width=3), mode='lines+markers'))
+        fig.add_trace(go.Scatter(x=a_daily['date'], y=a_daily['result_ftd'], name='FTD', line=dict(color='#27ae60', width=3), mode='lines+markers', yaxis='y2'))
         fig.update_layout(
             height=350,
-            yaxis=dict(title='Cost ($)', side='left'),
+            yaxis=dict(title='Spend ($)', side='left'),
             yaxis2=dict(title='FTD', side='right', overlaying='y'),
             legend=dict(orientation='h', yanchor='bottom', y=1.02),
             margin=dict(l=20, r=20, t=40, b=20),
@@ -271,57 +294,60 @@ with tab1:
     st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================
-# TAB 5: INDIVIDUAL OVERALL (P-tab data)
+# TAB 5: INDIVIDUAL OVERALL (INDIVIDUAL KPI data)
 # ============================================================
 
 with tab5:
-    st.subheader("📈 Individual Overall (Channel ROI)")
+    st.subheader("📈 Individual Overall (INDIVIDUAL KPI)")
 
-    if has_ptab:
-        agent_daily = ptab_daily[ptab_daily['agent'] == ptab_agent].copy()
-        agent_monthly = ptab_monthly[ptab_monthly['agent'] == ptab_agent] if not ptab_monthly.empty else pd.DataFrame()
+    if has_kpi:
+        # Aggregate daily data (sum redistributed rows per date)
+        agent_daily = agent_kpi_df.groupby('date').agg({
+            'spend': 'sum', 'spend_php': 'sum', 'ftd': 'sum', 'register': 'sum',
+            'reach': 'sum', 'impressions': 'sum', 'clicks': 'sum',
+        }).reset_index().sort_values('date')
+
+        # Recalculate derived metrics after aggregation
+        agent_daily['ctr'] = agent_daily.apply(lambda r: round((r['clicks'] / r['impressions'] * 100) if r['impressions'] > 0 else 0, 2), axis=1)
+        agent_daily['cpc'] = agent_daily.apply(lambda r: round((r['spend'] / r['clicks']) if r['clicks'] > 0 else 0, 2), axis=1)
+        agent_daily['cpm'] = agent_daily.apply(lambda r: round((r['spend'] / r['impressions'] * 1000) if r['impressions'] > 0 else 0, 2), axis=1)
+        agent_daily['cost_per_register'] = agent_daily.apply(lambda r: round((r['spend'] / r['register']) if r['register'] > 0 else 0, 2), axis=1)
+        agent_daily['cost_per_ftd'] = agent_daily.apply(lambda r: round((r['spend'] / r['ftd']) if r['ftd'] > 0 else 0, 2), axis=1)
+        agent_daily['conv_rate'] = agent_daily.apply(lambda r: round((r['ftd'] / r['register'] * 100) if r['register'] > 0 else 0, 2), axis=1)
 
         # KPI cards
-        total_cost = agent_daily['cost'].sum()
+        total_spend = agent_daily['spend'].sum()
         total_reg = int(agent_daily['register'].sum())
         total_ftd = int(agent_daily['ftd'].sum())
-        avg_cpr = total_cost / total_reg if total_reg > 0 else 0
-        avg_cpd = total_cost / total_ftd if total_ftd > 0 else 0
+        avg_cpr = total_spend / total_reg if total_reg > 0 else 0
+        avg_cpd = total_spend / total_ftd if total_ftd > 0 else 0
         conv_rate = (total_ftd / total_reg * 100) if total_reg > 0 else 0
+        total_reach = int(agent_daily['reach'].sum())
+        total_impr = int(agent_daily['impressions'].sum())
+        total_clicks = int(agent_daily['clicks'].sum())
 
-        col1, col2, col3, col4, col5, col6 = st.columns(6)
-        col1.metric("Cost", f"${total_cost:,.2f}")
-        col2.metric("Register", f"{total_reg:,}")
-        col3.metric("FTD", f"{total_ftd:,}")
-        col4.metric("CPR", f"${avg_cpr:.2f}")
-        col5.metric("Cost/FTD", f"${avg_cpd:.2f}")
-        col6.metric("Conv Rate", f"{conv_rate:.1f}%")
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        c1.metric("Spend", f"${total_spend:,.2f}")
+        c2.metric("Register", f"{total_reg:,}")
+        c3.metric("FTD", f"{total_ftd:,}")
+        c4.metric("CPR", f"${avg_cpr:.2f}")
+        c5.metric("Cost/FTD", f"${avg_cpd:.2f}")
+        c6.metric("Conv Rate", f"{conv_rate:.1f}%")
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("People Reach", f"{total_reach:,}")
+        c2.metric("Impressions", f"{total_impr:,}")
+        c3.metric("Clicks", f"{total_clicks:,}")
+        c4.metric("CTR", f"{(total_clicks / total_impr * 100) if total_impr > 0 else 0:.2f}%")
 
         st.divider()
-
-        # Monthly summary
-        if not agent_monthly.empty:
-            st.subheader("Monthly Summary")
-            m_display = agent_monthly[['month', 'cost', 'register', 'cpr', 'ftd', 'cpd', 'conv_rate', 'impressions', 'clicks', 'ctr', 'roas']].copy()
-            st.dataframe(
-                m_display, use_container_width=True, hide_index=True,
-                column_config={
-                    "cost": st.column_config.NumberColumn("Cost", format="$%.2f"),
-                    "cpr": st.column_config.NumberColumn("CPR", format="$%.2f"),
-                    "cpd": st.column_config.NumberColumn("CPD", format="$%.2f"),
-                    "conv_rate": st.column_config.NumberColumn("Conv %", format="%.2f%%"),
-                    "ctr": st.column_config.NumberColumn("CTR", format="%.2f%%"),
-                    "roas": st.column_config.NumberColumn("ROAS", format="%.2f%%"),
-                },
-            )
-            st.divider()
 
         # Daily trend charts
         col1, col2 = st.columns(2)
         with col1:
             fig = go.Figure()
-            fig.add_trace(go.Bar(x=agent_daily['date'], y=agent_daily['cost'], name='Cost', marker_color='#667eea'))
-            fig.update_layout(height=300, title='Daily Cost', xaxis_tickformat='%m/%d', margin=dict(l=20, r=20, t=40, b=20))
+            fig.add_trace(go.Bar(x=agent_daily['date'], y=agent_daily['spend'], name='Spend', marker_color='#667eea'))
+            fig.update_layout(height=300, title='Daily Spend', xaxis_tickformat='%m/%d', margin=dict(l=20, r=20, t=40, b=20))
             st.plotly_chart(fig, use_container_width=True)
         with col2:
             fig = go.Figure()
@@ -332,27 +358,27 @@ with tab5:
 
         # Daily data table
         st.subheader("Daily Data")
-        d_display = agent_daily[['date', 'cost', 'register', 'cpr', 'ftd', 'cpd', 'conv_rate', 'impressions', 'clicks', 'ctr', 'arppu', 'roas']].copy()
+        d_display = agent_daily[['date', 'spend', 'register', 'cost_per_register', 'ftd', 'cost_per_ftd', 'conv_rate', 'reach', 'impressions', 'clicks', 'ctr', 'cpm']].copy()
         d_display['date'] = d_display['date'].dt.strftime('%m/%d/%Y')
         st.dataframe(
             d_display.sort_values('date', ascending=False),
             use_container_width=True, hide_index=True,
             column_config={
-                "cost": st.column_config.NumberColumn("Cost", format="$%.2f"),
-                "cpr": st.column_config.NumberColumn("CPR", format="$%.2f"),
-                "cpd": st.column_config.NumberColumn("CPD", format="$%.2f"),
+                "spend": st.column_config.NumberColumn("Spend", format="$%.2f"),
+                "cost_per_register": st.column_config.NumberColumn("CPR", format="$%.2f"),
+                "cost_per_ftd": st.column_config.NumberColumn("Cost/FTD", format="$%.2f"),
                 "conv_rate": st.column_config.NumberColumn("Conv %", format="%.2f%%"),
+                "reach": st.column_config.NumberColumn("Reach", format="%d"),
+                "impressions": st.column_config.NumberColumn("Impressions", format="%d"),
+                "clicks": st.column_config.NumberColumn("Clicks", format="%d"),
                 "ctr": st.column_config.NumberColumn("CTR", format="%.2f%%"),
-                "arppu": st.column_config.NumberColumn("ARPPU", format="$%.2f"),
-                "roas": st.column_config.NumberColumn("ROAS", format="%.2f%%"),
+                "cpm": st.column_config.NumberColumn("CPM", format="$%.2f"),
             },
         )
-    elif ptab_agent:
-        st.warning(f"No Channel ROI data available for {selected_agent} ({ptab_agent}).")
-        if ptab_daily.empty:
-            st.error(f"P-tab loader returned 0 daily rows. Check credentials and sheet access.")
+    elif is_excluded:
+        st.info(f"{selected_agent}'s data has been redistributed across other agents.")
     else:
-        st.info(f"{selected_agent} does not have a P-tab in Channel ROI.")
+        st.warning(f"No INDIVIDUAL KPI data available for {selected_agent}.")
 
 # ============================================================
 # TAB 6: BY CAMPAIGN (Ad Account breakdown from P-tabs)

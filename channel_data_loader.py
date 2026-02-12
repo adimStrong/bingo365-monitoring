@@ -47,6 +47,12 @@ from config import (
     AGENT_PERF_DAILY_DATA_START,
     AGENT_PERF_AD_ACCOUNT_START_COL,
     AGENT_PERF_AD_ACCOUNT_STRIDE,
+    INDIVIDUAL_KPI_SHEET_ID,
+    INDIVIDUAL_KPI_GID,
+    INDIVIDUAL_KPI_AGENTS,
+    INDIVIDUAL_KPI_COL_OFFSETS,
+    INDIVIDUAL_KPI_DATA_START_ROW,
+    EXCLUDED_PERSONS,
 )
 
 
@@ -1175,6 +1181,139 @@ def load_agent_performance_data():
 def refresh_agent_performance_data():
     """Clear Agent Performance data cache."""
     load_agent_performance_data.clear()
+
+
+@st.cache_data(ttl=600)
+def load_individual_kpi_data():
+    """
+    Load per-agent daily data from INDIVIDUAL KPI tab.
+    Applies DER redistribution (splits DER metrics evenly across remaining agents).
+
+    Returns:
+        DataFrame with columns: date, person_name, spend, spend_php, ftd, register,
+                                reach, impressions, clicks, ctr, cpc, cpm,
+                                cost_per_register, cost_per_ftd
+    """
+    try:
+        client = get_google_client()
+        if client is None:
+            return pd.DataFrame()
+
+        spreadsheet = client.open_by_key(INDIVIDUAL_KPI_SHEET_ID)
+        ws = spreadsheet.get_worksheet_by_id(INDIVIDUAL_KPI_GID)
+        all_data = ws.get_all_values()
+
+        if len(all_data) < INDIVIDUAL_KPI_DATA_START_ROW + 1:
+            print("[WARNING] INDIVIDUAL KPI tab has insufficient rows")
+            return pd.DataFrame()
+
+        offsets = INDIVIDUAL_KPI_COL_OFFSETS
+        records = []
+
+        for row_idx in range(INDIVIDUAL_KPI_DATA_START_ROW, len(all_data)):
+            row = all_data[row_idx]
+
+            for start_col, agent_name in INDIVIDUAL_KPI_AGENTS.items():
+                # Get date
+                date_col = start_col + offsets['date']
+                if date_col >= len(row):
+                    continue
+                date_val = parse_date(str(row[date_col]).strip())
+                if not date_val:
+                    continue
+
+                # Get spend
+                spend_col = start_col + offsets['spend']
+                spend = parse_numeric(row[spend_col] if spend_col < len(row) else '')
+                if spend == 0:
+                    continue  # Skip zero-spend rows (future dates)
+
+                # Get other metrics
+                spend_php = parse_numeric(row[start_col + offsets['spend_php']] if start_col + offsets['spend_php'] < len(row) else '')
+                ftd = int(parse_numeric(row[start_col + offsets['ftd']] if start_col + offsets['ftd'] < len(row) else ''))
+                register = int(parse_numeric(row[start_col + offsets['register']] if start_col + offsets['register'] < len(row) else ''))
+                reach = int(parse_numeric(row[start_col + offsets['reach']] if start_col + offsets['reach'] < len(row) else ''))
+                impressions = int(parse_numeric(row[start_col + offsets['impressions']] if start_col + offsets['impressions'] < len(row) else ''))
+                clicks = int(parse_numeric(row[start_col + offsets['clicks']] if start_col + offsets['clicks'] < len(row) else ''))
+
+                # Derived metrics
+                ctr = round((clicks / impressions * 100) if impressions > 0 else 0, 2)
+                cpc = round((spend / clicks) if clicks > 0 else 0, 2)
+                cpm = round((spend / impressions * 1000) if impressions > 0 else 0, 2)
+                cost_per_register = round((spend / register) if register > 0 else 0, 2)
+                cost_per_ftd = round((spend / ftd) if ftd > 0 else 0, 2)
+
+                records.append({
+                    'date': date_val,
+                    'person_name': agent_name,
+                    'spend': spend,
+                    'spend_php': spend_php,
+                    'ftd': ftd,
+                    'register': register,
+                    'reach': reach,
+                    'impressions': impressions,
+                    'clicks': clicks,
+                    'ctr': ctr,
+                    'cpc': cpc,
+                    'cpm': cpm,
+                    'cost_per_register': cost_per_register,
+                    'cost_per_ftd': cost_per_ftd,
+                })
+
+        if not records:
+            print("[WARNING] INDIVIDUAL KPI: no data rows found")
+            return pd.DataFrame()
+
+        df = pd.DataFrame(records)
+        df['date'] = pd.to_datetime(df['date'])
+
+        # --- DER redistribution (same logic as Facebook Ads) ---
+        if EXCLUDED_PERSONS:
+            excluded_upper = [p.upper() for p in EXCLUDED_PERSONS]
+            excluded_mask = df['person_name'].str.upper().isin(excluded_upper)
+            excluded_df = df[excluded_mask]
+            df = df[~excluded_mask]
+
+            if not excluded_df.empty and not df.empty:
+                remaining_agents = df['person_name'].unique().tolist()
+                n_agents = len(remaining_agents)
+                numeric_cols = ['spend', 'spend_php', 'ftd', 'register', 'reach', 'impressions', 'clicks']
+
+                redistributed_rows = []
+                for _, row in excluded_df.iterrows():
+                    for agent in remaining_agents:
+                        new_row = row.copy()
+                        new_row['person_name'] = agent
+                        for col in numeric_cols:
+                            if col in new_row.index:
+                                new_row[col] = new_row[col] / n_agents
+                        # Recalculate derived metrics
+                        new_row['ctr'] = round((new_row['clicks'] / new_row['impressions'] * 100) if new_row['impressions'] > 0 else 0, 2)
+                        new_row['cpc'] = round((new_row['spend'] / new_row['clicks']) if new_row['clicks'] > 0 else 0, 2)
+                        new_row['cpm'] = round((new_row['spend'] / new_row['impressions'] * 1000) if new_row['impressions'] > 0 else 0, 2)
+                        new_row['cost_per_register'] = round((new_row['spend'] / new_row['register']) if new_row['register'] > 0 else 0, 2)
+                        new_row['cost_per_ftd'] = round((new_row['spend'] / new_row['ftd']) if new_row['ftd'] > 0 else 0, 2)
+                        redistributed_rows.append(new_row)
+
+                if redistributed_rows:
+                    redistributed_df = pd.DataFrame(redistributed_rows)
+                    df = pd.concat([df, redistributed_df], ignore_index=True)
+
+                print(f"[OK] INDIVIDUAL KPI: redistributed {EXCLUDED_PERSONS} across {n_agents} agents")
+
+        print(f"[OK] INDIVIDUAL KPI: {len(df)} rows loaded")
+        return df
+
+    except Exception as e:
+        print(f"[ERROR] Failed to load INDIVIDUAL KPI: {e}")
+        import traceback
+        traceback.print_exc()
+        return pd.DataFrame()
+
+
+def refresh_individual_kpi_data():
+    """Clear INDIVIDUAL KPI data cache."""
+    load_individual_kpi_data.clear()
 
 
 # Test functions

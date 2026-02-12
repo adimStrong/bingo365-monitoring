@@ -486,3 +486,27 @@ AGENT_PERF_DAILY_HEADERS_ROW = 9     # Row with column headers
 AGENT_PERF_DAILY_DATA_START = 10     # First daily data row
 AGENT_PERF_AD_ACCOUNT_START_COL = 15 # First ad account column (0-indexed)
 AGENT_PERF_AD_ACCOUNT_STRIDE = 5    # Every 5 columns per ad account
+
+# ============================================================
+# INDIVIDUAL KPI (new data source for Individual Overall tab)
+# ============================================================
+# Sheet: 13oDZjGctd8mkVik2_kUxSPpIQQUyC_iIuIHplIFWeUM  (same as FACEBOOK_ADS_SHEET_ID)
+# Tab: INDIVIDUAL KPI (GID 1788804487)
+INDIVIDUAL_KPI_SHEET_ID = "13oDZjGctd8mkVik2_kUxSPpIQQUyC_iIuIHplIFWeUM"
+INDIVIDUAL_KPI_GID = 1788804487
+
+# 8 agents, 10-column blocks
+INDIVIDUAL_KPI_AGENTS = {
+    17: "JASON", 27: "RON", 37: "SHILA", 47: "ADRIAN",
+    57: "JOMAR", 67: "KRISSA", 77: "MIKA", 87: "DER",
+}
+
+# Column offsets within each agent's 10-col block
+# +0: Date, +1: Type, +2: Spend($), +3: Spend(PHP), +4: FTD,
+# +5: Register, +6: People Reach, +7: Impressions, +8: Clicks
+INDIVIDUAL_KPI_COL_OFFSETS = {
+    'date': 0, 'type': 1, 'spend': 2, 'spend_php': 3,
+    'ftd': 4, 'register': 5, 'reach': 6, 'impressions': 7, 'clicks': 8,
+}
+
+INDIVIDUAL_KPI_DATA_START_ROW = 4  # 0-indexed, first daily data row
