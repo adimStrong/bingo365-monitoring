@@ -236,7 +236,7 @@ with tab1:
         if has_kpi:
             st.metric("Total Spend", f"${agent_kpi_df['spend'].sum():,.2f}")
             st.metric("Register", f"{int(agent_kpi_df['register'].sum()):,}")
-            st.metric("FTD", f"{int(agent_kpi_df['result_ftd'].sum()):,}")
+            st.metric("FTD", f"{int(agent_kpi_df['ftd'].sum()):,}")
         else:
             st.metric("Total Spend", "$0")
             st.metric("Register", "0")
@@ -278,7 +278,7 @@ with tab1:
     if has_kpi:
         a_daily = agent_kpi_df.sort_values('date')
         fig.add_trace(go.Scatter(x=a_daily['date'], y=a_daily['spend'], name='Spend ($)', line=dict(color='#3498db', width=3), mode='lines+markers'))
-        fig.add_trace(go.Scatter(x=a_daily['date'], y=a_daily['result_ftd'], name='FTD', line=dict(color='#27ae60', width=3), mode='lines+markers', yaxis='y2'))
+        fig.add_trace(go.Scatter(x=a_daily['date'], y=a_daily['ftd'], name='FTD', line=dict(color='#27ae60', width=3), mode='lines+markers', yaxis='y2'))
         fig.update_layout(
             height=350,
             yaxis=dict(title='Spend ($)', side='left'),
