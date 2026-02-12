@@ -246,11 +246,11 @@ TELEGRAM_MENTIONS = {
     "JASON": "Adsbasty",
     "RON": "xxxadsron",
     "DER": "Derr_Juan365",
-    "SHILA": "yakis0va",
-    "ADRIAN": "cutie0717",
+    "SHILA": "cutie07171",
+    "ADRIAN": "CrWn365",
     "KRISSA": "Ads_Krissa",
-    "MIKA": "CrWn365",
-    "JOMAR": "HappyAllDaze",
+    "MIKA": "yakis0va",
+    "JOMAR": "Jomarskii",
 }
 
 # ============================================================
