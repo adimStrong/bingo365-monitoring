@@ -233,19 +233,19 @@ if selected_agent == "All Agents":
     st.plotly_chart(fig, use_container_width=True)
 
     # Stacked weighted chart
-    st.subheader("Total Weighted Score (out of 2.80 max)")
+    st.subheader("Total Weighted Score (out of 4.00 max)")
     fig2 = go.Figure()
     fig2.add_trace(go.Bar(
         x=agents, y=summary_df['Auto'].tolist(),
-        name='Auto (CPA 25% + CVR 15%)', marker_color='#3b82f6',
+        name='Auto (CPA 12.5% + ROAS 12.5% + CVR 15% + CTR 7.5%)', marker_color='#3b82f6',
     ))
     fig2.add_trace(go.Bar(
         x=agents, y=summary_df['Manual'].tolist(),
-        name='Manual (Report 10% + Acct 10% + Team 10%)', marker_color='#a855f7',
+        name='Manual (Setup 15% + AB 7.5% + Report 10% + Acct 10% + Team 10%)', marker_color='#a855f7',
     ))
     fig2.update_layout(
         barmode='stack',
-        yaxis=dict(title='Weighted Score', range=[0, 3.0]),
+        yaxis=dict(title='Weighted Score', range=[0, 4.5]),
         height=350, margin=dict(t=30, b=40),
         legend=dict(orientation='h', y=1.1),
     )
@@ -386,7 +386,7 @@ else:
     t_color = "#22c55e" if grand_total >= 2.0 else "#eab308" if grand_total >= 1.5 else "#f97316" if grand_total >= 1.0 else "#ef4444"
     html += f'<tr style="background:#1e293b;color:#fff;font-weight:bold;border:1px solid #334155">'
     html += f'<td style="padding:8px;border:1px solid #334155" colspan="2">TOTAL SCORE</td>'
-    html += f'<td style="padding:8px;text-align:center;border:1px solid #334155">70%</td>'
+    html += f'<td style="padding:8px;text-align:center;border:1px solid #334155">100%</td>'
     html += f'<td style="padding:8px;border:1px solid #334155">Auto: {auto_weighted_total} + Manual: {manual_weighted_total}</td>'
     html += f'<td style="padding:8px;border:1px solid #334155"></td>'
     html += f'<td style="padding:8px;text-align:center;border:1px solid #334155;color:{t_color};font-size:16px">{grand_total}</td>'
@@ -399,11 +399,11 @@ else:
     st.divider()
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.markdown(f"**Auto (40%):** {auto_weighted_total} / 1.60")
-        st.progress(min(auto_weighted_total / 1.60, 1.0) if auto_weighted_total > 0 else 0)
+        st.markdown(f"**Auto (47.5%):** {auto_weighted_total} / 1.90")
+        st.progress(min(auto_weighted_total / 1.90, 1.0) if auto_weighted_total > 0 else 0)
     with col2:
-        st.markdown(f"**Manual (30%):** {manual_weighted_total} / 1.20")
-        st.progress(min(manual_weighted_total / 1.20, 1.0) if manual_weighted_total > 0 else 0)
+        st.markdown(f"**Manual (52.5%):** {manual_weighted_total} / 2.10")
+        st.progress(min(manual_weighted_total / 2.10, 1.0) if manual_weighted_total > 0 else 0)
     with col3:
-        st.markdown(f"**Grand Total (70%):** {grand_total} / 2.80")
-        st.progress(min(grand_total / 2.80, 1.0) if grand_total > 0 else 0)
+        st.markdown(f"**Grand Total (100%):** {grand_total} / 4.00")
+        st.progress(min(grand_total / 4.00, 1.0) if grand_total > 0 else 0)

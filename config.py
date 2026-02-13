@@ -531,7 +531,7 @@ KPI_PHP_USD_RATE = 57.7  # PHP to USD conversion for ROAS calc
 KPI_SCORING = {
     'cpa': {
         'name': 'CPA (Cost Per Acquisition)',
-        'weight': 0.25,
+        'weight': 0.125,    # 12.5% (CPA + ROAS = 25%)
         'krs': 'Revenue Generation',
         'auto': True,
         'thresholds': [(4, 9.0, 9.99), (3, 10.0, 13.0), (2, 14.0, 15.0), (1, 15.01, float('inf'))],
@@ -539,7 +539,7 @@ KPI_SCORING = {
     },
     'roas': {
         'name': 'ROAS',
-        'weight': 0,
+        'weight': 0.125,    # 12.5% (CPA + ROAS = 25%)
         'krs': 'Revenue Generation',
         'auto': True,
         'thresholds': [(4, 0.40, float('inf')), (3, 0.20, 0.39), (2, 0.10, 0.19), (1, 0, 0.099)],
@@ -547,7 +547,7 @@ KPI_SCORING = {
     },
     'cvr': {
         'name': 'CVR (Conversion Rate)',
-        'weight': 0.15,
+        'weight': 0.15,     # 15% (CVR + Campaign Setup = 30%)
         'krs': 'Revenue Generation',
         'auto': True,
         'thresholds': [(4, 7.0, 100.0), (3, 4.0, 6.99), (2, 2.0, 3.99), (1, 0, 1.99)],
@@ -555,7 +555,7 @@ KPI_SCORING = {
     },
     'ctr': {
         'name': 'CTR',
-        'weight': 0,
+        'weight': 0.075,    # 7.5% (CTR + A/B Testing = 15%)
         'krs': 'Campaign Efficiency',
         'auto': True,
         'thresholds': [(4, 3.0, 100.0), (3, 2.0, 2.99), (2, 1.0, 1.99), (1, 0, 0.99)],
@@ -565,13 +565,13 @@ KPI_SCORING = {
 
 # Manual KPIs (for display on dashboard - manager scores these)
 KPI_MANUAL = {
-    'campaign_setup': {'name': 'Campaign Setup Accuracy', 'weight': 0, 'krs': 'Campaign Efficiency'},
-    'ab_testing': {'name': 'A/B Testing', 'weight': 0, 'krs': 'Campaign Efficiency'},
-    'reporting': {'name': 'Reporting Accuracy', 'weight': 0.10, 'krs': 'Data & Reporting'},
+    'campaign_setup': {'name': 'Campaign Setup Accuracy', 'weight': 0.15, 'krs': 'Campaign Efficiency'},  # 15% (CVR + Campaign Setup = 30%)
+    'ab_testing': {'name': 'A/B Testing', 'weight': 0.075, 'krs': 'Campaign Efficiency'},                 # 7.5% (CTR + A/B Testing = 15%)
+    'reporting': {'name': 'Reporting Accuracy', 'weight': 0.10, 'krs': 'Data & Reporting'},                # 10%
     'data_insights': {'name': 'Data-Driven Insights', 'weight': 0, 'krs': 'Data & Reporting'},
-    'account_dev': {'name': 'Gmail/FB Account Dev', 'weight': 0.10, 'krs': 'Account Management'},
+    'account_dev': {'name': 'Gmail/FB Account Dev', 'weight': 0.10, 'krs': 'Account Management'},          # 10%
     'profile_dev': {'name': 'Profile Development', 'weight': 0, 'krs': 'Account Management'},
-    'collaboration': {'name': 'Collaboration', 'weight': 0.10, 'krs': 'Teamwork'},
+    'collaboration': {'name': 'Collaboration', 'weight': 0.10, 'krs': 'Teamwork'},                         # 10%
     'communication': {'name': 'Communication', 'weight': 0, 'krs': 'Teamwork'},
 }
 
