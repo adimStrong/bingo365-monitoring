@@ -602,3 +602,13 @@ REPORT_KEYWORDS = [
     "report", "daily report", "update", "summary",
     "register", "ftd", "spend", "cost",
 ]
+
+# Proper report format requires BOTH a campaign/format indicator AND cost data
+REPORT_CAMPAIGN_INDICATORS = [
+    "prom", "promo", "b-fb-fb-", "channel", "brandkw", "high int",
+    "comp", "p-max", "auto test", "google ads", "meta ads",
+    "as of", "hourly report", "yesterday report",
+]
+
+# Agents excluded from reporting accuracy (boss/non-reporters)
+EXCLUDED_FROM_REPORTING = ["DER"]

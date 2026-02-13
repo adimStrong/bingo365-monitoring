@@ -24,7 +24,9 @@ from config import (
     TELEGRAM_ALT_USERNAMES,
     REPORTING_ACCURACY_SCORING,
     REPORT_KEYWORDS,
+    REPORT_CAMPAIGN_INDICATORS,
     FACEBOOK_ADS_PERSONS,
+    EXCLUDED_FROM_REPORTING,
 )
 
 st.set_page_config(page_title="Reporting Accuracy", page_icon="📝", layout="wide")
@@ -94,11 +96,16 @@ def load_reporting_scores():
 
 
 def is_report_message(text):
-    """Check if a message contains report-related keywords."""
-    if not text:
+    """Check if a message is a proper report (has campaign/format indicator + cost data).
+
+    Casual messages like 'Wala pang cost?' won't match.
+    """
+    if not text or not isinstance(text, str):
         return False
     text_lower = text.lower()
-    return any(kw in text_lower for kw in REPORT_KEYWORDS)
+    has_cost_data = any(kw in text_lower for kw in ["cost:", "cost per ftd", "cpc:"])
+    has_indicator = any(ind in text_lower for ind in REPORT_CAMPAIGN_INDICATORS)
+    return has_cost_data and has_indicator
 
 
 def calculate_agent_scores(agent_df):
@@ -171,7 +178,7 @@ def main():
 
         st.markdown("---")
         st.subheader("👤 Agent Filter")
-        agents = ["All"] + [p.title() for p in FACEBOOK_ADS_PERSONS]
+        agents = ["All"] + [p.title() for p in FACEBOOK_ADS_PERSONS if p not in EXCLUDED_FROM_REPORTING]
         agent_filter = st.selectbox("Select Agent", agents)
 
         st.markdown("---")
@@ -235,6 +242,8 @@ def main():
             # Calculate scores per agent
             all_scores = []
             for agent_name in sorted(agent_msgs['agent'].unique()):
+                if agent_name.upper() in EXCLUDED_FROM_REPORTING:
+                    continue
                 if agent_filter != "All" and agent_name != agent_filter:
                     continue
                 adf = agent_msgs[agent_msgs['agent'] == agent_name]
