@@ -149,15 +149,9 @@ def main():
     # Get current timestamp
     now = datetime.now()
     current_time = now.strftime("%I:%M %p")
-    current_date = now.strftime("%B %d, %Y")
 
-    # Dashboard Header
-    st.markdown(f"""
-    <div class="dashboard-header">
-        <h1>📊 ADVERTISER KPI DASHBOARD</h1>
-        <p style="font-size: 1.2em; margin: 0;">{current_date} | {current_time}</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Dashboard Header (date updated after data loads below)
+    header_placeholder = st.empty()
 
     # Send Report Button
     col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 3])
@@ -217,16 +211,38 @@ def main():
         st.error("No Facebook Ads data available")
         return
 
-    # Get latest date in data
+    # Get all dates in data
     fb_ads_df['date_only'] = pd.to_datetime(fb_ads_df['date']).dt.date
-    latest_date = fb_ads_df['date_only'].max()
+    available_dates = sorted(fb_ads_df['date_only'].unique(), reverse=True)
+    latest_date = available_dates[0] if available_dates else None
 
-    # Filter for latest date
-    today_data = fb_ads_df[fb_ads_df['date_only'] == latest_date]
+    # Date filter
+    col_date, col_spacer = st.columns([1, 3])
+    with col_date:
+        selected_date = st.selectbox(
+            "📅 Select Date",
+            options=available_dates,
+            index=0,
+            format_func=lambda d: d.strftime("%b %d, %Y (%A)"),
+        )
+
+    # Filter for selected date
+    today_data = fb_ads_df[fb_ads_df['date_only'] == selected_date]
 
     if today_data.empty:
-        st.warning(f"No data for {latest_date}")
+        st.warning(f"No data for {selected_date}")
         return
+
+    # Update header with selected date
+    current_date = selected_date.strftime("%B %d, %Y")
+
+    # Render header with selected date
+    header_placeholder.markdown(f"""
+    <div class="dashboard-header">
+        <h1>📊 ADVERTISER KPI DASHBOARD</h1>
+        <p style="font-size: 1.2em; margin: 0;">{current_date} | {current_time}</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     # Load previous report for change detection
     previous_data = load_last_report_data()
@@ -506,7 +522,7 @@ def main():
 
     # Footer with data timestamp
     st.markdown("---")
-    st.caption(f"Data as of: {latest_date} | Dashboard generated: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+    st.caption(f"Data as of: {selected_date} | Dashboard generated: {now.strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 if __name__ == "__main__":

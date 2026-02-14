@@ -16,6 +16,8 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 
+import requests as http_requests
+
 from channel_data_loader import load_agent_performance_data as load_ptab_data
 from daily_report import generate_by_campaign_section
 from config import (
@@ -25,6 +27,10 @@ from config import (
     TELEGRAM_MENTIONS,
 )
 from telegram_reporter import TelegramReporter
+
+# Chat Listener API for reporting accuracy
+CHAT_API_URL = os.getenv("CHAT_API_URL", "https://humble-illumination-production-713f.up.railway.app")
+CHAT_API_KEY = os.getenv("CHAT_API_KEY", "juan365chat")
 
 # Configure logging
 logging.basicConfig(
@@ -83,6 +89,42 @@ def send_long_message(reporter, text, max_len=4000):
         logger.info(f"Sent message part {i+1}/{len(parts)} ({len(part)} chars)")
 
 
+def build_reporting_summary():
+    """Fetch reporting accuracy from Chat Listener API and build summary message."""
+    try:
+        resp = http_requests.get(
+            f"{CHAT_API_URL}/api/reporting",
+            params={'key': CHAT_API_KEY},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        if not data:
+            return None
+
+        # Sort by avg_minute ascending (best first)
+        agents = sorted(data.items(), key=lambda x: x[1].get('avg_minute', 99))
+
+        msg = '📊 <b>Reporting Accuracy Summary</b>\n'
+        msg += '<i>Auto-scored from Telegram chat reports</i>\n\n'
+        msg += '<pre>\n'
+        msg += f'{"Agent":<10} {"Reports":>7}  {"Avg Min":>7}  {"Score":>5}\n'
+        msg += '─' * 38 + '\n'
+        for agent, info in agents:
+            count = info.get('report_count', 0)
+            avg = info.get('avg_minute', 0)
+            score = info.get('score', 0)
+            msg += f'{agent:<10} {count:>7}  {avg:>5.1f}m  {score:>3}/4\n'
+        msg += '</pre>\n\n'
+        msg += '<b>Rubric:</b> 4: &lt;15min | 3: 15-24min | 2: 25-34min | 1: 35+min'
+
+        return msg
+    except Exception as e:
+        logger.error(f"Failed to fetch reporting accuracy: {e}")
+        return None
+
+
 def send_report():
     """Load P-tab data, generate report, and send to Telegram."""
     if not DAILY_REPORT_ENABLED:
@@ -117,6 +159,17 @@ def send_report():
     try:
         reporter = TelegramReporter()
         send_long_message(reporter, report)
+        logger.info("By Campaign report sent!")
+
+        # Send Reporting Accuracy Summary
+        logger.info("Fetching reporting accuracy summary...")
+        summary = build_reporting_summary()
+        if summary:
+            reporter.send_message(summary)
+            logger.info("Reporting accuracy summary sent!")
+        else:
+            logger.warning("No reporting accuracy data available")
+
         logger.info("Report sent to KPI Ads group!")
         return True
     except Exception as e:
@@ -139,7 +192,7 @@ def setup_scheduler():
         job_defaults={
             'coalesce': True,
             'max_instances': 1,
-            'misfire_grace_time': 300,
+            'misfire_grace_time': 3600,  # 1 hour grace period to catch misfires
         }
     )
 
@@ -240,6 +293,21 @@ def main():
 
     signal.signal(signal.SIGINT, graceful_shutdown)
     signal.signal(signal.SIGTERM, graceful_shutdown)
+
+    # Check if we missed today's report (scheduler started after 2pm)
+    try:
+        from pytz import timezone as pytz_tz
+        now_ph = datetime.now(pytz_tz('Asia/Manila'))
+    except ImportError:
+        now_ph = datetime.now()
+    send_hour = DAILY_REPORT_SEND_TIME['hour']
+    send_minute = DAILY_REPORT_SEND_TIME['minute']
+    if now_ph.hour == send_hour and now_ph.minute <= send_minute + 5:
+        # Started within 5 min of report time, send immediately
+        logger.info("Scheduler started at report time - sending report now!")
+        send_report()
+    elif now_ph.hour > send_hour or (now_ph.hour == send_hour and now_ph.minute > send_minute + 5):
+        logger.warning(f"Scheduler started after {send_hour}:{send_minute:02d} - report may have been missed today")
 
     scheduler = setup_scheduler()
 

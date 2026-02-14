@@ -231,7 +231,7 @@ NO_CHANGE_ALERT = True  # Alert if no change between periods
 # Screenshot settings
 DASHBOARD_URL = os.getenv(
     "DASHBOARD_URL",
-    "https://bingo365-monitoring-bjruxaftqm6xq2jvfojn8r.streamlit.app/Report_Dashboard"
+    "https://ads-monitoring.streamlit.app/Report_Dashboard"
 )
 SCREENSHOT_DIR = "reports/screenshots"
 
