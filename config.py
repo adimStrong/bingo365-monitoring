@@ -461,6 +461,12 @@ CREATED_ASSETS_COLUMNS = {
 ACCOUNT_DEV_ROW = 16
 
 # ============================================================
+# A/B TESTING CONFIGURATION (Channel ROI sheet)
+# ============================================================
+AB_TESTING_TAB = {"name": "Text/AbTest", "gid": 21055881}
+AB_TESTING_ROW = 13  # 0-indexed row in KPI sheet for A/B Testing write-back (row 14 in 1-indexed)
+
+# ============================================================
 # UPDATED ACCOUNTS CONFIGURATION
 # ============================================================
 # Separate spreadsheet with 3 tabs: FB accounts, BM, Pages
@@ -590,18 +596,18 @@ KPI_SCORING = {
     },
     'account_dev': {
         'name': 'Gmail/FB Account Dev',
-        'weight': 0.05,     # 5% (Account Dev 5% + Profile Dev 5% = 10%)
+        'weight': 0.10,     # 10% Account Management
         'krs': 'Account Management',
         'auto': True,
         'thresholds': [(4, 5, float('inf')), (3, 3, 4), (2, 2, 2), (1, 0, 1)],
         'direction': 'higher_better',
     },
-    'profile_dev': {
-        'name': 'Profile Development',
-        'weight': 0.05,     # 5% (Account Dev 5% + Profile Dev 5% = 10%)
-        'krs': 'Account Management',
+    'ab_testing': {
+        'name': 'A/B Testing',
+        'weight': 0.075,    # 7.5% (CTR + A/B Testing = 15%)
+        'krs': 'Campaign Efficiency',
         'auto': True,
-        'thresholds': [(4, 5, float('inf')), (3, 3, 4), (2, 2, 2), (1, 0, 1)],
+        'thresholds': [(4, 20, float('inf')), (3, 11, 19), (2, 6, 10), (1, 0, 5)],
         'direction': 'higher_better',
     },
 }
@@ -609,7 +615,6 @@ KPI_SCORING = {
 # Manual KPIs (for display on dashboard - manager scores these)
 KPI_MANUAL = {
     'campaign_setup': {'name': 'Campaign Setup Accuracy', 'weight': 0.15, 'krs': 'Campaign Efficiency'},  # 15% (CVR + Campaign Setup = 30%)
-    'ab_testing': {'name': 'A/B Testing', 'weight': 0.075, 'krs': 'Campaign Efficiency'},                 # 7.5% (CTR + A/B Testing = 15%)
     'reporting': {'name': 'Reporting Accuracy', 'weight': 0.10, 'krs': 'Data & Reporting'},                # 10%
     'data_insights': {'name': 'Data-Driven Insights', 'weight': 0, 'krs': 'Data & Reporting'},
     'collaboration': {'name': 'Collaboration', 'weight': 0.10, 'krs': 'Teamwork'},                         # 10%
@@ -618,7 +623,7 @@ KPI_MANUAL = {
 
 # KPI display order
 KPI_ORDER = ['cpa', 'roas', 'cvr', 'campaign_setup', 'ctr', 'ab_testing',
-             'reporting', 'data_insights', 'account_dev', 'profile_dev',
+             'reporting', 'data_insights', 'account_dev',
              'collaboration', 'communication']
 
 # KPI Sheet write-back configuration
@@ -633,7 +638,6 @@ KPI_AGENT_TABS = {
     'Jason': 'KPI-Jason',
     'Shila': 'KPI-Shila',
 }
-PROFILE_DEV_ROW = 17  # 0-indexed row in KPI sheet where Profile Dev score lives
 
 # ============================================================
 # TELEGRAM CHAT LISTENER CONFIGURATION

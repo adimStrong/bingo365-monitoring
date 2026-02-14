@@ -57,12 +57,13 @@ from config import (
     KPI_SCORING,
     KPI_SHEET_ID,
     KPI_AGENT_TABS,
-    PROFILE_DEV_ROW,
     ACCOUNT_DEV_ROW,
     CREATED_ASSETS_TAB,
     CREATED_ASSETS_COLUMNS,
     CREATED_ASSETS_HEADER_ROW,
     CREATED_ASSETS_DATA_START,
+    AB_TESTING_TAB,
+    AB_TESTING_ROW,
 )
 
 
@@ -1159,6 +1160,248 @@ def score_account_dev(total_accounts):
 
 
 @st.cache_data(ttl=600)  # Cache for 10 minutes
+def load_ab_testing_data():
+    """
+    Load A/B Testing data from Text/AbTest tab in Channel ROI sheet.
+
+    The sheet has:
+    - Summary section (rows 0-7): Per-agent OUTPUT counts
+    - Detail log (rows ~9+): DATE, CREATOR, HEADLINE, PRIMARY TEXT, then daily columns
+
+    We parse the detail log to count published campaigns per advertiser.
+    Each advertiser block has columns: AD STRUCTURE, TYPE OF CONTENT, CONDITION, PUBLISHED CAMPAIGN
+
+    Returns:
+        dict: {'summary': DataFrame (per-agent totals), 'detail': DataFrame (raw log)}
+    """
+    empty = {'summary': pd.DataFrame(), 'detail': pd.DataFrame()}
+    try:
+        client = get_google_client()
+        if client is None:
+            return empty
+
+        spreadsheet = client.open_by_key(CHANNEL_ROI_SHEET_ID)
+        worksheet = spreadsheet.get_worksheet_by_id(AB_TESTING_TAB['gid'])
+        all_data = worksheet.get_all_values()
+
+        if len(all_data) < 10:
+            print("[WARNING] Text/AbTest tab has insufficient rows")
+            return empty
+
+        # --- Parse summary section (rows 0-7) ---
+        # Row 2 typically: "Primary Text" label, then agent names in cols C-I
+        # Row 3: counts
+        # Row 4: "Published Ad" label, then counts
+        summary_records = []
+
+        # Find agent names from row 1-2 area
+        agent_names_row = None
+        for r_idx in range(min(5, len(all_data))):
+            row = all_data[r_idx]
+            # Look for row with agent names (Jason, Ron, etc.)
+            names_found = 0
+            for cell in row:
+                if str(cell).strip().upper() in ['JASON', 'RON', 'MIKA', 'SHILA', 'ADRIAN', 'JOMAR', 'KRISSA']:
+                    names_found += 1
+            if names_found >= 3:
+                agent_names_row = r_idx
+                break
+
+        if agent_names_row is not None:
+            names_row = all_data[agent_names_row]
+            # Map column index to agent name
+            agent_cols = {}
+            for col_idx, cell in enumerate(names_row):
+                name = str(cell).strip().upper()
+                if name in ['JASON', 'RON', 'MIKA', 'SHILA', 'ADRIAN', 'JOMAR', 'KRISSA']:
+                    agent_cols[col_idx] = name
+
+            # Look for Primary Text and Published Ad rows
+            for r_idx in range(agent_names_row + 1, min(agent_names_row + 6, len(all_data))):
+                row = all_data[r_idx]
+                label = str(row[1]).strip().lower() if len(row) > 1 else ''
+                if 'primary text' in label or 'published' in label:
+                    metric = 'primary_text' if 'primary' in label else 'published_ad'
+                    for col_idx, agent in agent_cols.items():
+                        if col_idx < len(row):
+                            count = int(parse_numeric(row[col_idx]))
+                            summary_records.append({
+                                'agent': agent,
+                                'metric': metric,
+                                'count': count,
+                            })
+
+        # --- Parse detail log ---
+        # Find the detail section start (look for DATE header)
+        detail_start = None
+        date_col = 1  # default col B
+        creator_col = 2  # default col C
+        headline_col = 3  # default col D
+        primary_text_col = 4  # default col E
+        advertiser_col = 8  # default col I
+
+        for r_idx in range(5, min(15, len(all_data))):
+            row = all_data[r_idx]
+            for c_idx, cell in enumerate(row):
+                if str(cell).strip().upper() == 'DATE':
+                    date_col = c_idx
+                    detail_start = r_idx + 1
+                    break
+                if str(cell).strip().upper() == 'CREATOR':
+                    creator_col = c_idx
+            if detail_start is not None:
+                break
+
+        # Also find ADVERTISER NAME column and daily date columns
+        if detail_start is not None and detail_start > 0:
+            header_row = all_data[detail_start - 1]
+            for c_idx, cell in enumerate(header_row):
+                upper = str(cell).strip().upper()
+                if upper == 'CREATOR':
+                    creator_col = c_idx
+                elif upper == 'HEADLINE':
+                    headline_col = c_idx
+                elif 'CREATED PRIMARY' in upper or 'PRIMARY TEXT' in upper:
+                    primary_text_col = c_idx
+                elif 'ADVERTISER' in upper:
+                    advertiser_col = c_idx
+
+        detail_records = []
+        if detail_start is not None:
+            # Find daily date column blocks (after ADVERTISER NAME)
+            # Each date has 4 sub-columns: AD STRUCTURE, TYPE, CONDITION, PUBLISHED CAMPAIGN
+            # The date headers are in the row BEFORE the column headers
+            date_header_row = all_data[detail_start - 2] if detail_start >= 2 else []
+            daily_dates = []
+            for c_idx in range(advertiser_col + 1, len(date_header_row)):
+                cell = str(date_header_row[c_idx]).strip()
+                dt = parse_date(cell)
+                if dt:
+                    daily_dates.append({'col': c_idx, 'date': dt})
+
+            current_date = None
+            current_creator = None
+
+            for r_idx in range(detail_start, len(all_data)):
+                row = all_data[r_idx]
+                if len(row) <= advertiser_col:
+                    continue
+
+                # Check for date in date column
+                date_val = parse_date(str(row[date_col]).strip()) if date_col < len(row) else None
+                if date_val:
+                    current_date = date_val
+
+                creator = str(row[creator_col]).strip() if creator_col < len(row) else ''
+                if creator:
+                    current_creator = creator
+
+                headline = str(row[headline_col]).strip() if headline_col < len(row) else ''
+                primary_text = str(row[primary_text_col]).strip() if primary_text_col < len(row) else ''
+                advertiser = str(row[advertiser_col]).strip() if advertiser_col < len(row) else ''
+
+                # Skip empty rows
+                if not headline and not primary_text and not advertiser:
+                    continue
+
+                # Count published campaigns from daily columns
+                total_published = 0
+                for dd in daily_dates:
+                    pub_col = dd['col'] + 3  # PUBLISHED CAMPAIGN is 4th sub-column (offset +3)
+                    if pub_col < len(row):
+                        pub_count = int(parse_numeric(row[pub_col]))
+                        total_published += pub_count
+
+                detail_records.append({
+                    'batch_date': current_date,
+                    'creator': current_creator or creator,
+                    'headline': headline,
+                    'primary_text': primary_text,
+                    'advertiser': advertiser,
+                    'total_published': total_published,
+                })
+
+        summary_df = pd.DataFrame(summary_records) if summary_records else pd.DataFrame()
+        detail_df = pd.DataFrame(detail_records) if detail_records else pd.DataFrame()
+
+        print(f"[OK] AB Testing: {len(summary_records)} summary rows, {len(detail_records)} detail rows")
+        return {'summary': summary_df, 'detail': detail_df}
+
+    except Exception as e:
+        print(f"[ERROR] Failed to load AB Testing data: {e}")
+        import traceback
+        traceback.print_exc()
+        return empty
+
+
+def refresh_ab_testing_data():
+    """Clear AB Testing data cache."""
+    load_ab_testing_data.clear()
+
+
+def count_ab_testing(ab_data):
+    """Count A/B testing metrics per agent from Text/AbTest data.
+
+    Args:
+        ab_data: dict from load_ab_testing_data()
+
+    Returns:
+        dict: {agent_upper: {'primary_text': N, 'published_ad': N, 'total_published': N}}
+    """
+    result = {}
+    summary_df = ab_data.get('summary', pd.DataFrame())
+    detail_df = ab_data.get('detail', pd.DataFrame())
+
+    # From summary section
+    if not summary_df.empty:
+        for _, row in summary_df.iterrows():
+            agent = str(row.get('agent', '')).strip().upper()
+            metric = row.get('metric', '')
+            count = int(row.get('count', 0))
+            if not agent:
+                continue
+            if agent not in result:
+                result[agent] = {'primary_text': 0, 'published_ad': 0, 'total_published': 0}
+            if metric == 'primary_text':
+                result[agent]['primary_text'] = count
+            elif metric == 'published_ad':
+                result[agent]['published_ad'] = count
+
+    # From detail section - count total published per advertiser
+    if not detail_df.empty:
+        for _, row in detail_df.iterrows():
+            advertiser = str(row.get('advertiser', '')).strip().upper()
+            published = int(row.get('total_published', 0))
+            if not advertiser or published == 0:
+                continue
+            if advertiser not in result:
+                result[advertiser] = {'primary_text': 0, 'published_ad': 0, 'total_published': 0}
+            result[advertiser]['total_published'] += published
+
+    # Use published_ad from summary as the scoring metric (if available),
+    # otherwise use total_published from detail
+    for agent in result:
+        if result[agent]['published_ad'] == 0:
+            result[agent]['published_ad'] = result[agent]['total_published']
+
+    return result
+
+
+def score_ab_testing(published_count):
+    """Score A/B Testing based on published campaign count.
+
+    Rubric: 4 if >= 20, 3 if >= 11, 2 if >= 6, 1 if < 6
+    """
+    if published_count >= 20:
+        return 4
+    elif published_count >= 11:
+        return 3
+    elif published_count >= 6:
+        return 2
+    return 1
+
+
+@st.cache_data(ttl=600)  # Cache for 10 minutes
 def load_agent_performance_data():
     """
     Load Agent Performance data from P-tabs (P6-P13) in Channel ROI sheet.
@@ -1539,14 +1782,13 @@ def score_profile_dev(total_count):
     return 1
 
 
-def calculate_kpi_scores(monthly_df, agent_name, daily_df=None, accounts_data=None, created_assets_data=None):
+def calculate_kpi_scores(monthly_df, agent_name, daily_df=None, accounts_data=None, created_assets_data=None, ab_testing_data=None):
     """Calculate auto KPI scores for an agent from P-tab data.
     ROAS = ARPPU / 57.7 / Cost_per_FTD (IFERROR -> 0)
 
     Uses monthly data for CPA/CVR, calculates CTR from clicks/impressions,
     and gets ARPPU from daily data (latest available) for ROAS.
     Account Dev is scored from Created Assets tab (Gmail + FB accounts).
-    Profile Dev is scored from Created Assets tab (FB Pages + BMs).
 
     Returns dict: {metric_key: {'score': int, 'value': float, 'name': str, ...}}
     """
@@ -1623,17 +1865,20 @@ def calculate_kpi_scores(monthly_df, agent_name, daily_df=None, accounts_data=No
         'fb_accounts': acct_fb,
     }
 
-    # Profile Dev (FB Pages + BMs from Created Assets)
-    prof_pages = asset_counts.get('fb_pages', 0)
-    prof_bms = asset_counts.get('bms', 0)
-    prof_total = asset_counts.get('total_assets', 0)
-    prof_score = score_profile_dev(prof_total)
-    scores['profile_dev'] = {
-        'score': prof_score,
-        'value': prof_total,
-        'name': KPI_SCORING['profile_dev']['name'],
-        'fb_pages': prof_pages,
-        'bms': prof_bms,
+    # A/B Testing (Published campaigns from Text/AbTest tab)
+    ab_counts = {}
+    if ab_testing_data is not None:
+        ab_counts = count_ab_testing(ab_testing_data).get(agent_upper, {})
+
+    ab_published = ab_counts.get('published_ad', 0)
+    ab_primary = ab_counts.get('primary_text', 0)
+    ab_score = score_ab_testing(ab_published)
+    scores['ab_testing'] = {
+        'score': ab_score,
+        'value': ab_published,
+        'name': KPI_SCORING['ab_testing']['name'],
+        'primary_text': ab_primary,
+        'published_ad': ab_published,
     }
 
     return scores
@@ -1668,11 +1913,11 @@ def get_google_write_client():
 
 
 def write_kpi_scores_to_sheet(agent_name, scores_dict):
-    """Write Account Dev and Profile Dev scores to the agent's KPI tab in Google Sheets.
+    """Write auto-scored KPI values to the agent's KPI tab in Google Sheets.
 
     Args:
         agent_name: Agent name (e.g. 'Mika')
-        scores_dict: dict from calculate_kpi_scores() with account_dev and profile_dev entries
+        scores_dict: dict from calculate_kpi_scores() with account_dev and ab_testing entries
 
     Returns:
         (success: bool, message: str)
@@ -1695,7 +1940,7 @@ def write_kpi_scores_to_sheet(agent_name, scores_dict):
         acct_info = scores_dict.get('account_dev', {})
         acct_score = acct_info.get('score', 0)
         acct_raw = acct_info.get('value', 0)
-        acct_weight = KPI_SCORING.get('account_dev', {}).get('weight', 0.05)
+        acct_weight = KPI_SCORING.get('account_dev', {}).get('weight', 0.10)
         acct_weighted = round(acct_score * acct_weight, 4)
 
         acct_row_num = ACCOUNT_DEV_ROW + 1  # 0-indexed to 1-indexed
@@ -1704,18 +1949,18 @@ def write_kpi_scores_to_sheet(agent_name, scores_dict):
         worksheet.update_cell(acct_row_num, 7, int(acct_raw))
         messages.append(f"Account Dev score={acct_score}, assets={int(acct_raw)}")
 
-        # Write Profile Dev (row PROFILE_DEV_ROW)
-        profile_info = scores_dict.get('profile_dev', {})
-        prof_score = profile_info.get('score', 0)
-        prof_raw = profile_info.get('value', 0)
-        prof_weight = KPI_SCORING.get('profile_dev', {}).get('weight', 0.05)
-        prof_weighted = round(prof_score * prof_weight, 4)
+        # Write A/B Testing (row AB_TESTING_ROW)
+        ab_info = scores_dict.get('ab_testing', {})
+        ab_score = ab_info.get('score', 0)
+        ab_raw = ab_info.get('value', 0)
+        ab_weight = KPI_SCORING.get('ab_testing', {}).get('weight', 0.075)
+        ab_weighted = round(ab_score * ab_weight, 4)
 
-        prof_row_num = PROFILE_DEV_ROW + 1
-        worksheet.update_cell(prof_row_num, 5, prof_score)
-        worksheet.update_cell(prof_row_num, 6, prof_weighted)
-        worksheet.update_cell(prof_row_num, 7, int(prof_raw))
-        messages.append(f"Profile Dev score={prof_score}, assets={int(prof_raw)}")
+        ab_row_num = AB_TESTING_ROW + 1  # 0-indexed to 1-indexed
+        worksheet.update_cell(ab_row_num, 5, ab_score)
+        worksheet.update_cell(ab_row_num, 6, ab_weighted)
+        worksheet.update_cell(ab_row_num, 7, int(ab_raw))
+        messages.append(f"A/B Testing score={ab_score}, published={int(ab_raw)}")
 
         return True, f"Wrote to {tab_name}: {'; '.join(messages)}"
 
