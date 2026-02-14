@@ -528,15 +528,20 @@ def send_realtime_report(send_screenshot=True, send_text=True, combined=True):
             screenshot_path = generate_dashboard_screenshot()
 
         # 8. Send report (combined or separate)
-        if combined and screenshot_path:
+        # Telegram caption limit is 1024 chars - send separately if too long
+        CAPTION_LIMIT = 1024
+
+        if combined and screenshot_path and len(text_summary) <= CAPTION_LIMIT:
             # Send single message: photo with text as caption
-            # Telegram caption limit is 1024 chars, so use full text
             reporter.send_photo(screenshot_path, caption=text_summary)
             print("[OK] Dashboard + summary sent to Telegram (combined)")
         else:
-            # Send separately
+            # Send separately (caption too long or no screenshot)
             if screenshot_path:
-                reporter.send_photo(screenshot_path, caption=f"\U0001f4ca Dashboard - {latest_date}")
+                reporter.send_photo(
+                    screenshot_path,
+                    caption=f"\U0001f4ca ADVERTISER KPI REPORT - {latest_date}"
+                )
                 print("[OK] Screenshot sent to Telegram")
             elif send_screenshot:
                 print("[WARNING] Screenshot capture failed, sending text only")
@@ -554,8 +559,11 @@ def send_realtime_report(send_screenshot=True, send_text=True, combined=True):
 
     except Exception as e:
         print(f"[ERROR] Failed to send real-time report: {e}")
-        import traceback
-        traceback.print_exc()
+        try:
+            import traceback
+            traceback.print_exc()
+        except OSError:
+            pass  # Windows may fail on Unicode in traceback output
         return False
 
 

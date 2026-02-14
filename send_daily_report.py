@@ -33,6 +33,10 @@ from config import (
     TELEGRAM_MENTIONS,
 )
 from telegram_reporter import TelegramReporter
+from realtime_reporter import generate_dashboard_screenshot
+
+# Lock file to prevent duplicate scheduler instances
+LOCK_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.daily_report.lock')
 
 # Chat Listener API for reporting accuracy
 CHAT_API_URL = os.getenv("CHAT_API_URL", "https://humble-illumination-production-713f.up.railway.app")
@@ -188,6 +192,19 @@ def send_report():
     logger.info("Sending to Telegram...")
     try:
         reporter = TelegramReporter()
+
+        # Capture and send dashboard screenshot first
+        logger.info("Capturing dashboard screenshot...")
+        screenshot_path = generate_dashboard_screenshot()
+        if screenshot_path:
+            reporter.send_photo(
+                screenshot_path,
+                caption=f"📊 <b>BINGO365 T+1 Report</b> - {yesterday.strftime('%b %d, %Y')}"
+            )
+            logger.info("Dashboard screenshot sent!")
+        else:
+            logger.warning("Screenshot capture failed, continuing with text report")
+
         send_long_message(reporter, report)
         logger.info("By Campaign report sent!")
 
@@ -300,9 +317,42 @@ def print_schedule():
     print("=" * 50 + "\n")
 
 
+def acquire_lock():
+    """Acquire a lock file to prevent duplicate scheduler instances. Returns True if acquired."""
+    try:
+        if os.path.exists(LOCK_FILE):
+            # Check if the PID in the lock file is still running
+            with open(LOCK_FILE, 'r') as f:
+                old_pid = int(f.read().strip())
+            # Check if process is still alive
+            try:
+                os.kill(old_pid, 0)  # signal 0 = check if alive
+                return False  # Process still running
+            except (OSError, ProcessLookupError):
+                logger.warning(f"Stale lock file (PID {old_pid} dead), removing...")
+                os.remove(LOCK_FILE)
+        # Write our PID
+        with open(LOCK_FILE, 'w') as f:
+            f.write(str(os.getpid()))
+        return True
+    except Exception as e:
+        logger.error(f"Lock file error: {e}")
+        return True  # Proceed anyway on error
+
+
+def release_lock():
+    """Release the lock file."""
+    try:
+        if os.path.exists(LOCK_FILE):
+            os.remove(LOCK_FILE)
+    except Exception:
+        pass
+
+
 def graceful_shutdown(signum, frame):
     """Handle shutdown signals gracefully."""
     logger.info("Received shutdown signal, stopping scheduler...")
+    release_lock()
     sys.exit(0)
 
 
@@ -335,6 +385,11 @@ def main():
         logger.warning("Daily reporting is disabled. Set DAILY_REPORT_ENABLED = True in config.py")
         return
 
+    # Prevent duplicate scheduler instances
+    if not acquire_lock():
+        logger.error("Another daily report scheduler is already running! Exiting.")
+        return
+
     # Start scheduler
     print_schedule()
     logger.info("Starting Daily Report Scheduler...")
@@ -350,11 +405,7 @@ def main():
         now_ph = datetime.now()
     send_hour = DAILY_REPORT_SEND_TIME['hour']
     send_minute = DAILY_REPORT_SEND_TIME['minute']
-    if now_ph.hour == send_hour and now_ph.minute <= send_minute + 5:
-        # Started within 5 min of report time, send immediately
-        logger.info("Scheduler started at report time - sending report now!")
-        send_report()
-    elif now_ph.hour > send_hour or (now_ph.hour == send_hour and now_ph.minute > send_minute + 5):
+    if now_ph.hour > send_hour or (now_ph.hour == send_hour and now_ph.minute > send_minute + 5):
         logger.warning(f"Scheduler started after {send_hour}:{send_minute:02d} - report may have been missed today")
 
     scheduler = setup_scheduler()
@@ -367,6 +418,7 @@ def main():
     finally:
         if scheduler.running:
             scheduler.shutdown(wait=False)
+        release_lock()
 
 
 if __name__ == "__main__":

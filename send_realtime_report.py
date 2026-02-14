@@ -66,9 +66,7 @@ def send_scheduled_report():
         return success
 
     except Exception as e:
-        logger.error(f"Scheduled report failed: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception(f"Scheduled report failed: {e}")
         return False
 
 
