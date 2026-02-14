@@ -1,6 +1,7 @@
 """
 Report Dashboard for Real-Time KPI Monitoring
 Visual dashboard for screenshot-based reports
+Data source: P-tabs (P6-P13) from Channel ROI sheet
 """
 import streamlit as st
 import pandas as pd
@@ -13,10 +14,10 @@ import json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from data_loader import load_facebook_ads_data
+from channel_data_loader import load_agent_performance_data
 from config import (
     LOW_SPEND_THRESHOLD_USD, LAST_REPORT_DATA_FILE,
-    FACEBOOK_ADS_PERSONS
+    EXCLUDED_PERSONS,
 )
 
 st.set_page_config(
@@ -159,41 +160,13 @@ def main():
         if st.button("📤 Send to Telegram", type="primary", use_container_width=True):
             try:
                 from telegram_reporter import TelegramReporter
-                from realtime_reporter import (
-                    get_latest_date_data, load_previous_report, compare_with_previous,
-                    check_low_spend, detect_no_change_agents, generate_text_summary,
-                    prepare_report_data, save_current_report
-                )
-                from config import NO_CHANGE_ALERT
-
+                from send_daily_report import send_report
                 with st.spinner("Sending report to Telegram..."):
-                    # Get data
-                    current_data, latest_date = get_latest_date_data()
-                    if current_data is None or current_data.empty:
-                        st.error("No data available")
-                    else:
-                        # Load previous for comparison
-                        previous_data = load_previous_report()
-                        changes = compare_with_previous(current_data, previous_data, latest_date)
-                        low_spend = check_low_spend(current_data)
-                        no_change = detect_no_change_agents(changes) if NO_CHANGE_ALERT else []
-
-                        # Generate text summary
-                        text_summary = generate_text_summary(
-                            current_data, latest_date, changes, low_spend, no_change
-                        )
-
-                        # Send to Telegram
-                        reporter = TelegramReporter()
-                        reporter.send_message(text_summary)
-
-                        # Save for next comparison
-                        report_data = prepare_report_data(current_data, latest_date)
-                        save_current_report(report_data)
-
+                    success = send_report()
+                    if success:
                         st.success("✅ Report sent!")
-            except ValueError as e:
-                st.error(f"⚠️ Telegram not configured: {e}")
+                    else:
+                        st.error("❌ Failed to send report")
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
     with col_btn2:
@@ -203,18 +176,28 @@ def main():
 
     st.markdown("")  # Spacer
 
-    # Load data
-    with st.spinner("Loading data..."):
-        fb_ads_df = load_facebook_ads_data()
+    # Load P-tab data
+    with st.spinner("Loading P-tab data..."):
+        ptab_data = load_agent_performance_data()
 
-    if fb_ads_df is None or fb_ads_df.empty:
-        st.error("No Facebook Ads data available")
+    daily_df = ptab_data.get('daily', pd.DataFrame()) if ptab_data else pd.DataFrame()
+
+    if daily_df is None or daily_df.empty:
+        st.error("No P-tab data available")
         return
 
+    # Exclude agents
+    excluded = [e.upper() for e in EXCLUDED_PERSONS] if EXCLUDED_PERSONS else []
+    if excluded:
+        daily_df = daily_df[~daily_df['agent'].str.upper().isin(excluded)]
+
     # Get all dates in data
-    fb_ads_df['date_only'] = pd.to_datetime(fb_ads_df['date']).dt.date
-    available_dates = sorted(fb_ads_df['date_only'].unique(), reverse=True)
-    latest_date = available_dates[0] if available_dates else None
+    daily_df['date_only'] = pd.to_datetime(daily_df['date']).dt.date
+    available_dates = sorted(daily_df['date_only'].unique(), reverse=True)
+
+    if not available_dates:
+        st.error("No dates available in P-tab data")
+        return
 
     # Date filter
     col_date, col_spacer = st.columns([1, 3])
@@ -227,7 +210,7 @@ def main():
         )
 
     # Filter for selected date
-    today_data = fb_ads_df[fb_ads_df['date_only'] == selected_date]
+    today_data = daily_df[daily_df['date_only'] == selected_date]
 
     if today_data.empty:
         st.warning(f"No data for {selected_date}")
@@ -249,12 +232,11 @@ def main():
 
     # Calculate team totals
     team_totals = {
-        'spend': today_data['spend'].sum(),
+        'spend': today_data['cost'].sum(),
         'register': int(today_data['register'].sum()),
-        'ftd': int(today_data['result_ftd'].sum()),
+        'ftd': int(today_data['ftd'].sum()),
         'impressions': int(today_data['impressions'].sum()),
         'clicks': int(today_data['clicks'].sum()),
-        'reach': int(today_data['reach'].sum()),
     }
 
     # Derived metrics
@@ -328,16 +310,16 @@ def main():
     st.markdown("### 👥 AGENT PERFORMANCE")
 
     # Get agent data
-    agent_data = today_data.groupby('person_name').agg({
-        'spend': 'sum',
+    agent_data = today_data.groupby('agent').agg({
+        'cost': 'sum',
         'register': 'sum',
-        'result_ftd': 'sum',
+        'ftd': 'sum',
         'impressions': 'sum',
         'clicks': 'sum'
     }).reset_index()
 
-    # Sort by spend descending
-    agent_data = agent_data.sort_values('spend', ascending=False)
+    # Sort by cost descending
+    agent_data = agent_data.sort_values('cost', ascending=False)
 
     # Get previous agent data
     prev_agents = previous_data.get('agents', {}) if previous_data else {}
@@ -355,13 +337,13 @@ def main():
         for j, col in enumerate(cols):
             if i + j < num_agents:
                 agent = agent_data.iloc[i + j]
-                agent_name = agent['person_name']
-                spend = agent['spend']
+                agent_name = agent['agent']
+                spend = agent['cost']
                 reg = int(agent['register'])
-                ftd = int(agent['result_ftd'])
+                ftd = int(agent['ftd'])
 
-                # Get previous data for this agent
-                prev_agent = prev_agents.get(agent_name, {})
+                # Get previous data for this agent (try both original name and uppercase)
+                prev_agent = prev_agents.get(agent_name, prev_agents.get(agent_name.upper(), {}))
 
                 # Calculate changes
                 spend_diff, spend_change = calculate_change(spend, prev_agent, 'spend')
@@ -380,7 +362,7 @@ def main():
                 card_class = "agent-card"
                 if is_low_spend:
                     card_class += " agent-card-warning"
-                elif not is_low_spend:
+                else:
                     card_class += " agent-card-ok"
 
                 # Status indicator
@@ -426,10 +408,10 @@ def main():
         # Bar chart: Spend by agent
         fig_spend = px.bar(
             agent_data,
-            x='person_name',
-            y='spend',
+            x='agent',
+            y='cost',
             title='Spend by Agent',
-            color='spend',
+            color='cost',
             color_continuous_scale='Blues'
         )
         fig_spend.update_layout(
@@ -443,10 +425,10 @@ def main():
         # Bar chart: FTD by agent
         fig_ftd = px.bar(
             agent_data,
-            x='person_name',
-            y='result_ftd',
+            x='agent',
+            y='ftd',
             title='FTD by Agent',
-            color='result_ftd',
+            color='ftd',
             color_continuous_scale='Greens'
         )
         fig_ftd.update_layout(
@@ -457,8 +439,8 @@ def main():
         st.plotly_chart(fig_ftd, use_container_width=True)
 
     # Cost Efficiency Chart
-    agent_data['cpr'] = agent_data.apply(lambda x: x['spend'] / x['register'] if x['register'] > 0 else 0, axis=1)
-    agent_data['cpftd'] = agent_data.apply(lambda x: x['spend'] / x['result_ftd'] if x['result_ftd'] > 0 else 0, axis=1)
+    agent_data['cpr'] = agent_data.apply(lambda x: x['cost'] / x['register'] if x['register'] > 0 else 0, axis=1)
+    agent_data['cpftd'] = agent_data.apply(lambda x: x['cost'] / x['ftd'] if x['ftd'] > 0 else 0, axis=1)
 
     col1, col2 = st.columns(2)
 
@@ -466,7 +448,7 @@ def main():
         # Cost per Register chart
         fig_cpr = px.bar(
             agent_data[agent_data['cpr'] > 0],
-            x='person_name',
+            x='agent',
             y='cpr',
             title='Cost Per Register by Agent',
             color='cpr',
@@ -484,7 +466,7 @@ def main():
         # Cost per FTD chart
         fig_cpftd = px.bar(
             agent_data[agent_data['cpftd'] > 0],
-            x='person_name',
+            x='agent',
             y='cpftd',
             title='Cost Per FTD by Agent',
             color='cpftd',
@@ -522,7 +504,7 @@ def main():
 
     # Footer with data timestamp
     st.markdown("---")
-    st.caption(f"Data as of: {selected_date} | Dashboard generated: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+    st.caption(f"Data as of: {selected_date} | Dashboard generated: {now.strftime('%Y-%m-%d %H:%M:%S')} | Source: P-tabs")
 
 
 if __name__ == "__main__":
