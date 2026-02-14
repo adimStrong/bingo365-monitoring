@@ -18,8 +18,14 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 
 import requests as http_requests
 
-from channel_data_loader import load_agent_performance_data as load_ptab_data
-from daily_report import generate_by_campaign_section
+from channel_data_loader import (
+    load_agent_performance_data as load_ptab_data,
+    load_ab_testing_data, load_created_assets_data,
+)
+from daily_report import (
+    generate_by_campaign_section,
+    generate_ab_testing_section, generate_account_dev_section,
+)
 from config import (
     DAILY_REPORT_ENABLED,
     DAILY_REPORT_SEND_TIME,
@@ -125,6 +131,30 @@ def build_reporting_summary():
         return None
 
 
+def build_ab_testing_summary():
+    """Load A/B Testing data and build summary message."""
+    try:
+        ab_data = load_ab_testing_data()
+        if not ab_data:
+            return None
+        return generate_ab_testing_section(ab_data)
+    except Exception as e:
+        logger.error(f"Failed to build A/B Testing summary: {e}")
+        return None
+
+
+def build_account_dev_summary():
+    """Load Created Assets data and build Account Dev summary message."""
+    try:
+        assets_df = load_created_assets_data()
+        if assets_df is None or assets_df.empty:
+            return None
+        return generate_account_dev_section(assets_df)
+    except Exception as e:
+        logger.error(f"Failed to build Account Dev summary: {e}")
+        return None
+
+
 def send_report():
     """Load P-tab data, generate report, and send to Telegram."""
     if not DAILY_REPORT_ENABLED:
@@ -169,6 +199,24 @@ def send_report():
             logger.info("Reporting accuracy summary sent!")
         else:
             logger.warning("No reporting accuracy data available")
+
+        # Send A/B Testing Progress
+        logger.info("Building A/B Testing summary...")
+        ab_summary = build_ab_testing_summary()
+        if ab_summary:
+            reporter.send_message(ab_summary)
+            logger.info("A/B Testing summary sent!")
+        else:
+            logger.warning("No A/B Testing data available")
+
+        # Send Account Dev Progress
+        logger.info("Building Account Dev summary...")
+        acct_summary = build_account_dev_summary()
+        if acct_summary:
+            reporter.send_message(acct_summary)
+            logger.info("Account Dev summary sent!")
+        else:
+            logger.warning("No Account Dev data available")
 
         logger.info("Report sent to KPI Ads group!")
         return True

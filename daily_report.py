@@ -10,7 +10,11 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from data_loader import load_agent_performance_data, load_agent_content_data, load_indian_promotion_content
-from channel_data_loader import load_agent_performance_data as load_ptab_data
+from channel_data_loader import (
+    load_agent_performance_data as load_ptab_data,
+    count_ab_testing, score_ab_testing,
+    count_created_assets, score_account_dev,
+)
 from config import AGENTS, FACEBOOK_ADS_PERSONS, EXCLUDED_PERSONS, AGENT_PERFORMANCE_TABS
 from telegram_reporter import TelegramReporter
 
@@ -769,6 +773,102 @@ def generate_no_ads_report(creative_list, sms_list, content_list, report_date):
             report += "</pre>"
 
     return report
+
+
+def generate_ab_testing_section(ab_data):
+    """Generate A/B Testing Progress section for Telegram report.
+
+    Args:
+        ab_data: dict from load_ab_testing_data()
+
+    Returns:
+        str: HTML-formatted section or None on error
+    """
+    try:
+        counts = count_ab_testing(ab_data)
+        if not counts:
+            return None
+
+        # Sort by published_ad descending
+        sorted_agents = sorted(counts.items(), key=lambda x: x[1].get('published_ad', 0), reverse=True)
+
+        msg = '\U0001f9ea <b>A/B Testing Progress</b>\n\n<pre>\n'
+        msg += f'{"Agent":<10} {"Texts":>5}  {"Published":>9}  {"Score":>5}\n'
+        msg += '\u2500' * 38 + '\n'
+
+        total_texts = 0
+        total_published = 0
+
+        for agent, info in sorted_agents:
+            texts = info.get('primary_text', 0)
+            published = info.get('published_ad', 0)
+            score = score_ab_testing(published)
+            total_texts += texts
+            total_published += published
+
+            t_str = str(texts) if texts > 0 else '-'
+            p_str = str(published) if published > 0 else '-'
+            msg += f'{agent.title():<10} {t_str:>5}  {p_str:>9}  {score}/4\n'
+
+        msg += '\u2500' * 38 + '\n'
+        msg += f'{"TOTAL":<10} {total_texts:>5}  {total_published:>9}\n'
+        msg += '</pre>\n\n'
+        msg += '<b>Scoring:</b> 4 (\u226520) | 3 (11-19) | 2 (6-10) | 1 (&lt;6)'
+
+        return msg
+    except Exception as e:
+        print(f"[ERROR] generate_ab_testing_section: {e}")
+        return None
+
+
+def generate_account_dev_section(assets_df):
+    """Generate Account Dev Progress section for Telegram report.
+
+    Args:
+        assets_df: DataFrame from load_created_assets_data()
+
+    Returns:
+        str: HTML-formatted section or None on error
+    """
+    try:
+        counts = count_created_assets(assets_df)
+        if not counts:
+            return None
+
+        # Sort by total_accounts descending
+        sorted_agents = sorted(counts.items(), key=lambda x: x[1].get('total_accounts', 0), reverse=True)
+
+        msg = '\U0001f3d7 <b>Account Dev Progress</b>\n\n<pre>\n'
+        msg += f'{"Agent":<10} {"Gmail":>5}  {"FB Acct":>7}  {"Total":>5}  {"Score":>5}\n'
+        msg += '\u2500' * 41 + '\n'
+
+        total_gmail = 0
+        total_fb = 0
+        total_all = 0
+
+        for agent, info in sorted_agents:
+            gmail = info.get('gmail', 0)
+            fb = info.get('fb_accounts', 0)
+            total = info.get('total_accounts', 0)
+            score = score_account_dev(total)
+            total_gmail += gmail
+            total_fb += fb
+            total_all += total
+
+            g_str = str(gmail) if gmail > 0 else '-'
+            f_str = str(fb) if fb > 0 else '-'
+            t_str = str(total) if total > 0 else '0'
+            msg += f'{agent.title():<10} {g_str:>5}  {f_str:>7}  {t_str:>5}  {score}/4\n'
+
+        msg += '\u2500' * 41 + '\n'
+        msg += f'{"TOTAL":<10} {total_gmail:>5}  {total_fb:>7}  {total_all:>5}\n'
+        msg += '</pre>\n\n'
+        msg += '<b>Scoring:</b> 4 (\u22655) | 3 (3-4) | 2 (2) | 1 (&lt;2)'
+
+        return msg
+    except Exception as e:
+        print(f"[ERROR] generate_account_dev_section: {e}")
+        return None
 
 
 def generate_daily_report(report_date=None, send_to_telegram=True):
